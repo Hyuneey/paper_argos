@@ -47,6 +47,8 @@ class Engine(ABC):
         parallel_core=DEFAULT_PARALLEL_CORE,
         rule_per_group=3,
         max_iter=None,
+        segment_selection_mode="fixed",
+        segment_selector_config=None,
     ):
         self.chunk_size = chunk_size
         self.image_chunk_size = image_chunk_size
@@ -61,6 +63,8 @@ class Engine(ABC):
         self.sample_per_prompt = sample_per_prompt
         self.parallel_core = parallel_core
         self.rule_per_group = rule_per_group
+        self.segment_selection_mode = segment_selection_mode
+        self.segment_selector_config = segment_selector_config
         # for threading
         self.lock = threading.Lock()
 
@@ -96,6 +100,9 @@ class Engine(ABC):
             image_chunk_size=image_chunk_size,
             train_test_split=train_test_split,
             model_res_path=model_res_path,
+            segment_selection_mode=segment_selection_mode,
+            segment_selector_config=segment_selector_config,
+            selection_trace_dir=rule_path,
         )
         # save logs to file
         logging.basicConfig(
@@ -884,6 +891,9 @@ class Engine(ABC):
             "time_elapsed": time.time() - start_time,
             "best_rule_paths": last_rule_path,
             "mode": self.mode,
+            "segment_selection_mode": self.segment_selection_mode,
+            "segment_selector_config": self.segment_selector_config,
+            "selection_trace_paths": self.dataset.get_selection_trace_paths(),
             "token_count": {},
         }
         for agent in [self.detection_agent, self.repair_agent, self.review_agent]:
@@ -1082,6 +1092,9 @@ class Engine(ABC):
             "time_elapsed": time.time() - start_time,
             "best_rule_path": last_rule_path,
             "mode": self.mode,
+            "segment_selection_mode": self.segment_selection_mode,
+            "segment_selector_config": self.segment_selector_config,
+            "selection_trace_paths": self.dataset.get_selection_trace_paths(),
             "token_count": {},
         }
         for agent in [self.detection_agent]:

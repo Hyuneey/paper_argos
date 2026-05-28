@@ -36,7 +36,9 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo"):
         # "gpt-4-32k-0613",
         "gpt-35-turbo-16k",
         "gpt-4o",
+        "gpt-4o-mini",
         "gpt-4-32k",
+        "gpt-5.4-mini",
         "meta-llama/Llama-3.1-8B-Instruct",
         "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
     }:

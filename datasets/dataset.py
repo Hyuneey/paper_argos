@@ -6,6 +6,10 @@ from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 
+from segment_selection.candidate_generator import generate_candidates
+from segment_selection.selector import SegmentSelector
+from segment_selection.trace_logger import write_selection_trace
+
 
 class ArgosDataset(ABC):
     def __init__(
@@ -18,6 +22,10 @@ class ArgosDataset(ABC):
         train_test_split=0.7,
         val_split=0.2,
         model_res_path=None,
+        segment_selection_mode="fixed",
+        segment_selector_config=None,
+        selection_trace_dir=None,
+        selection_random_seed=8,
     ) -> None:
         """
         Args:
@@ -33,6 +41,22 @@ class ArgosDataset(ABC):
         self.train_test_split = train_test_split
         self.val_split = val_split
         self.model_res_path = model_res_path
+        self.segment_selection_mode = segment_selection_mode
+        self.segment_selector_config = segment_selector_config
+        self.selection_trace_dir = selection_trace_dir
+        self.selection_random_seed = selection_random_seed
+        self.selection_call_count = 0
+        self.selection_trace_paths = []
+        self.skip_training = False
+        if self.segment_selection_mode not in {"fixed", "evidence"}:
+            raise ValueError(
+                f"Invalid segment_selection_mode={self.segment_selection_mode}"
+            )
+        self.segment_selector = (
+            SegmentSelector(segment_selector_config)
+            if self.segment_selection_mode == "evidence"
+            else None
+        )
         self.preprocess()
 
     def preprocess(self):
@@ -94,6 +118,10 @@ class ArgosDataset(ABC):
                 )
 
         elif self.dataset_mode == "all-in-one":
+            if self.segment_selection_mode == "evidence":
+                raise NotImplementedError(
+                    "Evidence-aware segment selection currently supports one-by-one mode only"
+                )
             # assert dataset_path is a directory
             assert os.path.isdir(self.dataset_path), "Dataset should be a directory"
             dataset_files = os.listdir(self.dataset_path)
@@ -423,7 +451,35 @@ class ArgosDataset(ABC):
 
     def get_train_df_by_iter(self, iter_num):
         chunk_id = iter_num % len(self.train_dict)
-        return self.train_dict[chunk_id]
+        fixed_df = self.train_dict[chunk_id]
+        if self.segment_selection_mode == "fixed":
+            return fixed_df
+
+        # This selector intentionally uses labels to build candidates. It is an
+        # oracle-like research analysis for studying prompt evidence quality, not
+        # a deployable anomaly detector input policy.
+        candidates = generate_candidates(
+            self.train_df,
+            self.chunk_size,
+            iter_num,
+            fixed_df=fixed_df,
+            random_seed=self.selection_random_seed,
+        )
+        selection = self.segment_selector.select(
+            candidates, self.train_df, self.chunk_size
+        )
+        trace_path = write_selection_trace(
+            selection,
+            self.selection_trace_dir,
+            iter_num=iter_num,
+            call_id=self.selection_call_count,
+            random_seed=self.selection_random_seed,
+            config_path=self.segment_selector_config,
+        )
+        self.selection_call_count += 1
+        if trace_path:
+            self.selection_trace_paths.append(trace_path)
+        return selection.selected.df
 
     def get_test_df_by_iter(self, iter_num):
         chunk_id = iter_num % len(self.test_dict)
@@ -547,6 +603,12 @@ class ArgosDataset(ABC):
 
     def get_skip_training(self):
         return self.skip_training
+
+    def get_selection_trace_paths(self):
+        return list(self.selection_trace_paths)
+
+    def get_segment_selection_mode(self):
+        return self.segment_selection_mode
 
     def get_model_test_labels(self, curve_name=None):
         assert (

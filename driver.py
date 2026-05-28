@@ -43,22 +43,33 @@ def main(args):
     repeat = args.repeat
     top_k = args.top_k
     llm_engine = args.llm_engine
+    llm_provider = args.llm_provider
     timeout = args.timeout
     sample_per_prompt = args.sample_per_prompt
     p_cores = args.p_cores
     rule_per_group = args.rule_per_group
     max_iter = args.max_iter
+    segment_selection_mode = args.segment_selection_mode
+    segment_selector_config = args.segment_selector_config
 
     if repeat > 1:
         assert (
             mode != "eval-LLM-only" and mode != "eval-combined"
         ), "Evaluation mode does not support repeat"
 
+    if llm_provider:
+        os.environ["ARGOS_LLM_PROVIDER"] = llm_provider
+
     for i in tqdm.tqdm(range(repeat), dynamic_ncols=True):
-        postfix = dataset_path.split("/")[-1].split(".")[0]
-        final_result_path = os.path.join(
-            result_path, datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_" + postfix
-        )
+        postfix = os.path.splitext(os.path.basename(dataset_path))[0]
+        if args.result_path_is_final:
+            final_result_path = result_path
+        else:
+            final_result_path = os.path.join(
+                result_path,
+                datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_" + postfix,
+            )
+        os.makedirs(final_result_path, exist_ok=True)
 
         if mode == "eval-LLM-only":
             engine = Engine(
@@ -72,6 +83,8 @@ def main(args):
                 train_test_split=train_test_split,
                 top_k=top_k,
                 rule_per_group=rule_per_group,
+                segment_selection_mode=segment_selection_mode,
+                segment_selector_config=segment_selector_config,
             )
         elif mode == "eval-combined":
             engine = Engine(
@@ -85,6 +98,8 @@ def main(args):
                 train_test_split=train_test_split,
                 top_k=top_k,
                 rule_per_group=rule_per_group,
+                segment_selection_mode=segment_selection_mode,
+                segment_selector_config=segment_selector_config,
             )
         else:
             engine = Engine(
@@ -104,8 +119,11 @@ def main(args):
                 parallel_core=p_cores,
                 rule_per_group=rule_per_group,
                 max_iter=max_iter,
+                segment_selection_mode=segment_selection_mode,
+                segment_selector_config=segment_selector_config,
             )
 
+        write_metadata(args, final_result_path, repeat_id=i + 1)
         logging.info(f"args: {args}")
         print(f"args: {args}")
 
@@ -139,6 +157,39 @@ def main(args):
             engine.run()
 
 
+def write_metadata(args, final_result_path, repeat_id):
+    if args.llm_provider == "chatgpt-oauth" and args.llm_engine == "gpt-4-mini":
+        resolved_llm_engine = "gpt-5.4-mini"
+    else:
+        resolved_llm_engine = {"gpt-4-mini": "gpt-4o-mini"}.get(
+            args.llm_engine, args.llm_engine
+        )
+    metadata = {
+        "dataset": os.path.splitext(os.path.basename(args.dataset_path))[0],
+        "dataset_path": args.dataset_path,
+        "chunk_size": args.chunk_size,
+        "mode": args.mode,
+        "dataset_mode": args.dataset_mode,
+        "top_k": args.top_k,
+        "repeat_id": repeat_id,
+        "llm_engine": args.llm_engine,
+        "resolved_llm_engine": resolved_llm_engine,
+        "llm_provider": args.llm_provider,
+        "temperature": 0.75,
+        "segment_selection_mode": args.segment_selection_mode,
+        "selector_config_path": args.segment_selector_config,
+        "timestamp": datetime.now().isoformat(),
+        "notes": (
+            "Evidence mode uses label-based candidate generation as an "
+            "oracle-like analysis setting."
+            if args.segment_selection_mode == "evidence"
+            else ""
+        ),
+    }
+    with open(os.path.join(final_result_path, "metadata.json"), "w") as f:
+        json.dump(metadata, f, indent=2)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -152,6 +203,11 @@ if __name__ == "__main__":
         type=str,
         default="",
         help="The path to save the generated rules",
+    )
+    parser.add_argument(
+        "--result_path_is_final",
+        action="store_true",
+        help="Use result_path directly instead of creating a timestamped child directory.",
     )
     parser.add_argument(
         "--rule_path",
@@ -229,9 +285,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--llm_engine",
         type=str,
-        default="gpt-4-32k",
-        choices=["gpt-4-32k", "gpt-4o", "gpt-35-turbo-16k", "meta-llama/Llama-3.1-8B-Instruct", "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"],
+        default="gpt-4o",
         help="The engine to use for LLM",
+    )
+    parser.add_argument(
+        "--llm_provider",
+        type=str,
+        default="azure",
+        choices=["azure", "openai", "chatgpt-oauth", "self-hosted", "auto"],
+        help=(
+            "LLM auth/provider. Use chatgpt-oauth to read a ChatGPT/Codex "
+            "OAuth access token from ARGOS_OPENAI_OAUTH_TOKEN or ~/.codex/auth.json."
+        ),
     )
     parser.add_argument(
         "--timeout",
@@ -263,6 +328,19 @@ if __name__ == "__main__":
         type=int,
         default=None,
         help="Cap the number of training iterations. If unset, uses the mode's default.",
+    )
+    parser.add_argument(
+        "--segment_selection_mode",
+        type=str,
+        default="fixed",
+        choices=["fixed", "evidence"],
+        help="Segment selection policy for training prompts.",
+    )
+    parser.add_argument(
+        "--segment_selector_config",
+        type=str,
+        default=None,
+        help="Path to the evidence-aware segment selector config.",
     )
     args = parser.parse_args()
     main(args)

@@ -7,7 +7,7 @@ name = "detection-agent"
 version = "0.0.0"
 description = "ReliaGuard Detection Agent"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 license = {file = "LICENSE"}
 keywords = ["Lucia", "Agent"]
 classifiers=[
@@ -34,5 +34,15 @@ dependencies = [
     "scikit-learn",
 ]
 
-[tool.setuptools]
-packages = ["agent"]
+[tool.setuptools.packages.find]
+include = [
+    "agent*",
+    "baseline*",
+    "common*",
+    "config*",
+    "datasets*",
+    "eval_metrics*",
+    "runtime*",
+    "selector*",
+    "segment_selection*",
+]

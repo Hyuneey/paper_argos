@@ -169,3 +169,6 @@ benchmark/
 openevolve_output*/
 baseline/openevolve/results_no_sample_feedback/
 baseline/openevolve/results_sample_feedback/
+
+# Local raw datasets
+datasets/dataset_1_KPI/
