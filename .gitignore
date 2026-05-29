@@ -164,6 +164,7 @@ cython_debug/
 # Results
 generated_rules/
 results/
+experiments/
 out/
 benchmark/
 openevolve_output*/

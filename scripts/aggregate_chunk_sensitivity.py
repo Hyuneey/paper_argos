@@ -63,6 +63,7 @@ def main():
         if not run_dir.is_dir():
             continue
         rows.append(aggregate_run(run_dir))
+    rows.sort(key=lambda row: (row.get("dataset") or "", row.get("chunk_size") or 0, row.get("repeat_id") or 0))
 
     with open(output_csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=SUMMARY_COLUMNS)
@@ -73,8 +74,8 @@ def main():
 def aggregate_run(run_dir: Path) -> dict:
     metadata = _read_json(run_dir / "metadata.json")
     stats = _read_json(run_dir / "stats.json")
-    chunk_size = metadata.get("chunk_size") or _parse_chunk_size(run_dir)
-    repeat_id = metadata.get("repeat_id") or _parse_repeat_id(run_dir)
+    chunk_size = _parse_chunk_size(run_dir) or metadata.get("chunk_size")
+    repeat_id = _parse_repeat_id(run_dir) or metadata.get("repeat_id")
 
     rule_path = _resolve_best_rule_path(run_dir, stats)
     train_eval = _read_eval_for_rule(rule_path, "train") or _best_eval(run_dir, "train")

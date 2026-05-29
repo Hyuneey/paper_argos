@@ -1,7 +1,9 @@
 import argparse
 import os
+import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
@@ -37,6 +39,8 @@ def parse_args():
     )
     parser.add_argument("--timeout", type=int, default=150)
     parser.add_argument("--max_iter", type=int, default=None)
+    parser.add_argument("--max_attempts", type=int, default=3)
+    parser.add_argument("--retry_wait_sec", type=int, default=15)
     parser.add_argument(
         "--segment_selection_mode",
         choices=["fixed", "evidence"],
@@ -69,6 +73,8 @@ def main():
         for repeat_id in range(1, args.repeats + 1):
             run_dir = output_root / f"chunk_{chunk_size}" / f"run_{repeat_id:02d}"
             run_dir.mkdir(parents=True, exist_ok=True)
+            if (run_dir / "stats.json").exists():
+                continue
 
             command = [
                 args.python,
@@ -105,15 +111,48 @@ def main():
                 command.extend(["--segment_selector_config", selector_config])
 
             log_path = run_dir / "driver_stdout.log"
-            with open(log_path, "w", encoding="utf-8") as log_file:
-                subprocess.run(
-                    command,
-                    cwd=repo_root,
-                    stdout=log_file,
-                    stderr=subprocess.STDOUT,
-                    check=True,
-                    env=os.environ.copy(),
-                )
+            last_error = None
+            for attempt_id in range(1, args.max_attempts + 1):
+                _cleanup_incomplete_run(run_dir)
+                attempt_log_path = run_dir / f"driver_stdout_attempt_{attempt_id:02d}.log"
+                with open(attempt_log_path, "w", encoding="utf-8") as log_file:
+                    try:
+                        subprocess.run(
+                            command,
+                            cwd=repo_root,
+                            stdout=log_file,
+                            stderr=subprocess.STDOUT,
+                            check=True,
+                            env=os.environ.copy(),
+                        )
+                        shutil.copyfile(attempt_log_path, log_path)
+                        last_error = None
+                        break
+                    except subprocess.CalledProcessError as exc:
+                        last_error = exc
+                if attempt_id < args.max_attempts:
+                    time.sleep(args.retry_wait_sec)
+            if last_error is not None:
+                raise last_error
+
+
+def _cleanup_incomplete_run(run_dir: Path) -> None:
+    generated_patterns = [
+        "rule*.py",
+        "*_eval_res_train.json",
+        "*_eval_res_val.json",
+        "*_eval_res_test.json",
+        "stats.json",
+        "metadata.json",
+        "output.log",
+        "driver_stdout.log",
+        "driver_stdout_attempt_*.log",
+        "selection_trace_iter_*.json",
+        "best_rule_path.txt",
+    ]
+    for pattern in generated_patterns:
+        for path in run_dir.glob(pattern):
+            path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

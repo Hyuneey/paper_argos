@@ -242,6 +242,8 @@ class LLM:
                 input=prompt,
                 text=True,
                 capture_output=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=TIMEOUT_LLM,
             )
             if completed.returncode != 0:
@@ -347,6 +349,10 @@ def _is_non_retryable_llm_error(error: Exception) -> bool:
             "does not exist",
             "insufficient_quota",
             "exceeded your current quota",
+            "stream disconnected before completion",
+            "error sending request for url",
+            "failed to connect to websocket",
+            "os error 10013",
         )
     )
 
