@@ -12,12 +12,13 @@ from segment_selection.candidate_generator import CandidateSegment
 
 
 DEFAULT_WEIGHTS = {
-    "anomaly_density": 0.30,
+    "anomaly_density": 0.15,
     "change_magnitude": 0.20,
-    "anomaly_coverage": 0.20,
-    "normal_contrast": 0.15,
-    "length_penalty": 0.10,
-    "token_cost": 0.05,
+    "anomaly_coverage": 0.15,
+    "normal_contrast": 0.25,
+    "reference_context": 0.15,
+    "length_penalty": 0.08,
+    "token_cost": 0.02,
 }
 
 
@@ -65,6 +66,7 @@ class UtilityScorer:
         anomaly_coverage = _safe_div(labels.sum(), all_labels.sum())
         change_magnitude = _change_magnitude(segment, full_df)
         normal_contrast = _normal_contrast(segment, full_df, candidate.reference_segment)
+        reference_context = 1.0 if candidate.reference_segment is not None else 0.0
         length_penalty = min(1.0, _safe_div(len(segment), max(1, target_chunk_size)))
         token_cost = length_penalty
 
@@ -73,6 +75,7 @@ class UtilityScorer:
             "change_magnitude": change_magnitude,
             "anomaly_coverage": anomaly_coverage,
             "normal_contrast": normal_contrast,
+            "reference_context": reference_context,
             "length_penalty": length_penalty,
             "token_cost": token_cost,
         }

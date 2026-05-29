@@ -43,7 +43,8 @@ class SegmentSelector:
             scored,
             key=lambda item: (
                 item[1].total,
-                item[1].components.get("anomaly_density", 0.0),
+                item[1].components.get("normal_contrast", 0.0),
+                item[1].components.get("reference_context", 0.0),
                 -item[0].length,
                 item[0].kind,
             ),

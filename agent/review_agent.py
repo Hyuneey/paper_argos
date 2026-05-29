@@ -22,6 +22,7 @@ from common.exception import (RuntimeException, SyntaxException,
 from datasets.dataset import ArgosDataset
 from eval_metrics.event_f1pa import EventF1PA
 from eval_metrics.point_f1 import PointF1
+from eval_metrics.point_f1_fixed import PointF1Fixed
 from eval_metrics.point_f1pa import PointF1PA
 
 EVOLUTION_THRESHOLD = 0.10
@@ -462,7 +463,7 @@ class ReviewAgent(Agent):
         scores = np.concatenate(scores)
         final_res_dict = self.eval_scores_by_metrics(scores, gt_labels)
         labels = np.zeros(shape=(len(gt_labels),))
-        threshold = final_res_dict["event-based f1 under pa with mode squeeze"][
+        threshold = final_res_dict["point-wise fixed f1"][
             "threshold"
         ]
         labels[scores >= threshold] = 1
@@ -480,6 +481,9 @@ class ReviewAgent(Agent):
         eval_interface = PointF1()
         eval_res_pf1 = eval_interface.calc(scores, gt_labels, None)
 
+        eval_interface = PointF1Fixed()
+        eval_res_pf1_fixed = eval_interface.calc(scores, gt_labels, None)
+
         eval_interface = PointF1PA()
         eval_res_pf1pa = eval_interface.calc(scores, gt_labels, None)
 
@@ -489,12 +493,14 @@ class ReviewAgent(Agent):
         if log:
             logging.info(report)
             logging.info(eval_res_pf1.to_dict())
+            logging.info(eval_res_pf1_fixed.to_dict())
             logging.info(eval_res_pf1pa.to_dict())
             logging.info(eval_res_ef1pa.to_dict())
 
         # combine 3 dicts in to a final_res_dict
         final_res_dict = {
             **eval_res_pf1.to_dict(),
+            **eval_res_pf1_fixed.to_dict(),
             **eval_res_pf1pa.to_dict(),
             **eval_res_ef1pa.to_dict(),
         }

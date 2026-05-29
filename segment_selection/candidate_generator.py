@@ -64,6 +64,35 @@ def generate_candidates(
     rng = np.random.default_rng(random_seed + int(iter_num))
 
     for start, end in anomaly_segments:
+        span = max(1, end - start)
+        for kind, margin_ratio in (
+            ("event_bounded_short", 0.50),
+            ("event_bounded_medium", 1.00),
+            ("event_bounded_long", 2.00),
+        ):
+            margin = max(1, int(round(span * margin_ratio)))
+            segment_start = max(0, start - margin)
+            segment_end = min(total_len, end + margin)
+            if segment_end <= segment_start:
+                continue
+            reference_segment = _nearest_normal_window(df, start, segment_end - segment_start)
+            rationale = [
+                f"event-bounded window around labeled anomaly segment {start}:{end}",
+                f"margin_ratio={margin_ratio:.2f}",
+            ]
+            if reference_segment is not None:
+                rationale.append("matched with nearby all-normal reference window")
+            candidates.append(
+                CandidateSegment(
+                    kind=kind,
+                    df=_window(df, segment_start, segment_end),
+                    start_pos=segment_start,
+                    end_pos=segment_end,
+                    rationale=tuple(rationale),
+                    reference_segment=reference_segment,
+                )
+            )
+
         center = (start + end) // 2
         for kind, fraction in (
             ("short_anomaly_centered", 0.25),
@@ -72,32 +101,27 @@ def generate_candidates(
         ):
             length = max(1, min(total_len, int(round(chunk_size * fraction))))
             segment_start, segment_end = _centered_bounds(center, length, total_len)
+            reference_segment = _nearest_normal_window(df, start, segment_end - segment_start)
+            rationale = (
+                f"window centered near labeled anomaly segment {start}:{end}",
+                "oracle-like analysis setting using labels for segment selection",
+            )
+            if reference_segment is not None:
+                rationale = rationale + ("matched with nearby all-normal reference window",)
             candidates.append(
                 CandidateSegment(
                     kind=kind,
                     df=_window(df, segment_start, segment_end),
                     start_pos=segment_start,
                     end_pos=segment_end,
-                    rationale=(
-                        f"window centered near labeled anomaly segment {start}:{end}",
-                        "oracle-like analysis setting using labels for segment selection",
-                    ),
+                    rationale=rationale,
+                    reference_segment=reference_segment,
                 )
             )
 
-        normal_ref = _nearest_normal_window(df, start, max(1, min(chunk_size, end - start)))
-        if normal_ref is not None:
-            ref_start, ref_end = normal_ref
-            candidates.append(
-                CandidateSegment(
-                    kind="nearby_normal_reference",
-                    df=_window(df, ref_start, ref_end),
-                    start_pos=ref_start,
-                    end_pos=ref_end,
-                    rationale=("nearby all-normal segment for contrast",),
-                    reference_segment=normal_ref,
-                )
-            )
+    if not anomaly_segments and total_len > 0:
+        # Keep the oracle-free fallback candidate set compact when the dataset has no anomalies.
+        pass
 
     if total_len > 0:
         random_len = min(chunk_size, total_len)

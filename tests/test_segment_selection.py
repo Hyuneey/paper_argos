@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 from datasets.dataset import ArgosDataset
-from segment_selection.candidate_generator import generate_candidates
+from segment_selection.candidate_generator import CandidateSegment, generate_candidates
 from segment_selection.selector import SegmentSelector
 from segment_selection.trace_logger import write_selection_trace
 from segment_selection.utility_scorer import load_selector_config
@@ -49,9 +49,15 @@ class SegmentSelectionTests(unittest.TestCase):
 
         kinds = {candidate.kind for candidate in candidates}
         self.assertIn("fixed_chunk", kinds)
-        self.assertIn("short_anomaly_centered", kinds)
+        self.assertTrue(any(kind.startswith("event_bounded_") for kind in kinds))
         self.assertTrue(all(candidate.length > 0 for candidate in candidates))
         self.assertTrue(all(0 <= candidate.start_pos <= candidate.end_pos <= len(df) for candidate in candidates))
+        self.assertTrue(
+            any(
+                candidate.kind.startswith("event_bounded_") and candidate.reference_segment is not None
+                for candidate in candidates
+            )
+        )
 
         no_anomaly_candidates = generate_candidates(_sample_df(10), chunk_size=4, iter_num=2)
         self.assertEqual(
@@ -66,18 +72,19 @@ class SegmentSelectionTests(unittest.TestCase):
                 "\n".join(
                     [
                         "weights:",
-                        "  anomaly_density: 0.30",
+                        "  anomaly_density: 0.15",
                         "  change_magnitude: 0.20",
-                        "  anomaly_coverage: 0.20",
-                        "  normal_contrast: 0.15",
-                        "  length_penalty: 0.10",
-                        "  token_cost: 0.05",
+                        "  anomaly_coverage: 0.15",
+                        "  normal_contrast: 0.25",
+                        "  reference_context: 0.15",
+                        "  length_penalty: 0.08",
+                        "  token_cost: 0.02",
                     ]
                 ),
                 encoding="utf-8",
             )
             config = load_selector_config(str(config_path))
-            self.assertEqual(config["weights"]["anomaly_density"], 0.30)
+            self.assertEqual(config["weights"]["anomaly_density"], 0.15)
 
             df = _sample_df(20, anomaly_ranges=[(8, 11)])
             candidates = generate_candidates(df, chunk_size=10, iter_num=3)
@@ -87,6 +94,55 @@ class SegmentSelectionTests(unittest.TestCase):
 
             self.assertEqual(first.selected.kind, second.selected.kind)
             self.assertEqual(first.selected_score.total, second.selected_score.total)
+
+    def test_selector_prefers_reference_context_on_ties(self):
+        df = pd.DataFrame(
+            {
+                "value": [0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 0.0, 0.0],
+                "label": [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
+                "index": list(range(12)),
+            }
+        )
+        candidates = [
+            CandidateSegment(
+                kind="anomaly_only",
+                df=df.iloc[4:8].copy(),
+                start_pos=4,
+                end_pos=8,
+                rationale=("dense anomaly window",),
+                reference_segment=None,
+            ),
+            CandidateSegment(
+                kind="matched_reference",
+                df=df.iloc[4:8].copy(),
+                start_pos=4,
+                end_pos=8,
+                rationale=("same anomaly window with matched reference",),
+                reference_segment=(0, 4),
+            ),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "selector.yaml"
+            config_path.write_text(
+                "\n".join(
+                    [
+                        "weights:",
+                        "  anomaly_density: 0.00",
+                        "  change_magnitude: 0.00",
+                        "  anomaly_coverage: 0.00",
+                        "  normal_contrast: 0.00",
+                        "  reference_context: 0.00",
+                        "  length_penalty: 0.00",
+                        "  token_cost: 0.00",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = SegmentSelector(str(config_path)).select(candidates, df, 4)
+
+        self.assertEqual(result.selected.kind, "matched_reference")
 
     def test_trace_logger_writes_expected_schema(self):
         with tempfile.TemporaryDirectory() as tmpdir:
