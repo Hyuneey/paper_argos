@@ -175,6 +175,63 @@ class SegmentSelectionTests(unittest.TestCase):
 
         self.assertEqual(result.selected.kind, "reference_anchored")
 
+    def test_selector_excludes_full_density_candidates_before_tie_breaks(self):
+        full_df = pd.DataFrame(
+            {
+                "value": [5.0, 5.0, 5.0, 5.0],
+                "label": [1, 1, 1, 1],
+                "index": list(range(4)),
+            }
+        )
+        mixed_df = pd.DataFrame(
+            {
+                "value": [5.0, 5.0, 5.0, 5.0],
+                "label": [1, 1, 0, 0],
+                "index": list(range(4)),
+            }
+        )
+        candidates = [
+            CandidateSegment(
+                kind="full_density",
+                df=full_df.copy(),
+                start_pos=0,
+                end_pos=4,
+                rationale=("anomaly-only window",),
+                reference_segment=None,
+            ),
+            CandidateSegment(
+                kind="mixed_window",
+                df=mixed_df.copy(),
+                start_pos=0,
+                end_pos=4,
+                rationale=("mixed window",),
+                reference_segment=None,
+            ),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "selector.yaml"
+            config_path.write_text(
+                "\n".join(
+                    [
+                        "weights:",
+                        "  anomaly_density: 0.15",
+                        "  change_magnitude: 0.00",
+                        "  anomaly_coverage: 0.00",
+                        "  normal_contrast: 0.00",
+                        "  reference_context: 0.00",
+                        "  normal_context_floor: 1.00",
+                        "  length_penalty: 0.00",
+                        "  token_cost: 0.00",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = SegmentSelector(str(config_path)).select(candidates, full_df, 4)
+
+        self.assertEqual(result.selected.kind, "mixed_window")
+
     def test_selector_can_restrict_candidate_kinds_by_prefix(self):
         df = _sample_df(12, anomaly_ranges=[(4, 6)])
         candidates = generate_candidates(df, chunk_size=6, iter_num=1)

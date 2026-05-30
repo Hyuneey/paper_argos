@@ -41,12 +41,19 @@ class SegmentSelector:
             for candidate in candidates
         ]
         filtered = self._filter_allowed_kinds(scored)
-        eligible = [
+        non_full_density = [
             (candidate, score)
             for candidate, score in filtered
+            if score.components.get("anomaly_density", 0.0) < 1.0
+        ]
+        eligible = [
+            (candidate, score)
+            for candidate, score in non_full_density
             if self._is_eligible(candidate, score)
         ]
-        pool = eligible or filtered or scored
+        pool = eligible or non_full_density
+        if not pool:
+            raise ValueError("No eligible segment candidates after excluding full-density windows")
         selected, selected_score = max(
             pool,
             key=lambda item: (
@@ -79,8 +86,6 @@ class SegmentSelector:
     @staticmethod
     def _is_eligible(candidate: CandidateSegment, score: UtilityScore) -> bool:
         components = score.components
-        if components.get("anomaly_density", 0.0) >= 1.0:
-            return False
         if components.get("normal_context_floor", 0.0) > 0.0:
             return False
         return True

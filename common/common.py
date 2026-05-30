@@ -26,6 +26,7 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo"):
         # If the model is not found, use the cl100k_base encoding and give a warning
         print("Warning: model not found. Using cl100k_base encoding.")
         encoding = tiktoken.get_encoding("cl100k_base")
+
     # Set the token count for different models
     if model in {
         # "gpt-3.5-turbo-0613",
@@ -35,19 +36,18 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo"):
         # "gpt-4-0613",
         # "gpt-4-32k-0613",
         "gpt-35-turbo-16k",
+        "gpt-4.1",
         "gpt-4o",
         "gpt-4o-mini",
         "gpt-4-32k",
         "gpt-5.4-mini",
         "meta-llama/Llama-3.1-8B-Instruct",
-        "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
     }:
         tokens_per_message = 3
         tokens_per_name = 1
     elif model == "gpt-3.5-turbo-0301":
-        tokens_per_message = (
-            4  # Each message follows the format {role/name}\n{content}\n
-        )
+        tokens_per_message = 4  # Each message follows the format {role/name}\n{content}\n
         tokens_per_name = -1  # If there is a name, the role will be omitted
     elif "gpt-3.5-turbo" in model:
         # For gpt-3.5-turbo, updates may occur. Here, the token count assumes gpt-3.5-turbo-0613 and gives a warning
@@ -66,6 +66,7 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo"):
         raise NotImplementedError(
             f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens."""
         )
+
     num_tokens = 0
     # Calculate the token count for each message
     for message in messages:
