@@ -37,7 +37,8 @@ def load_selector_config(path: str | None) -> dict[str, Any]:
     if not config_path.exists():
         raise FileNotFoundError(f"Segment selector config not found: {path}")
     text = config_path.read_text(encoding="utf-8")
-    return _parse_simple_yaml(text)
+    config = _parse_simple_yaml(text)
+    return _normalize_selector_config(config)
 
 
 def config_hash(config: dict[str, Any]) -> str:
@@ -170,6 +171,22 @@ def _parse_simple_yaml(text: str) -> dict[str, Any]:
             result[key] = parsed_value
             current_section = None
     return result
+
+
+def _normalize_selector_config(config: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(config)
+    for key in ("allowed_kind_prefixes", "preferred_kind_prefixes"):
+        value = normalized.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            items = [item.strip() for item in value.split(",") if item.strip()]
+        elif isinstance(value, (list, tuple, set)):
+            items = [str(item).strip() for item in value if str(item).strip()]
+        else:
+            items = [str(value).strip()] if str(value).strip() else []
+        normalized[key] = items
+    return normalized
 
 
 def _parse_scalar(value: str):

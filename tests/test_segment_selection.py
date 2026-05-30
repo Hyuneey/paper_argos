@@ -153,6 +153,33 @@ class SegmentSelectionTests(unittest.TestCase):
 
         self.assertEqual(result.selected.kind, "reference_anchored")
 
+    def test_selector_can_restrict_candidate_kinds_by_prefix(self):
+        df = _sample_df(12, anomaly_ranges=[(4, 6)])
+        candidates = generate_candidates(df, chunk_size=6, iter_num=1)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "selector.yaml"
+            config_path.write_text(
+                "\n".join(
+                    [
+                        "weights:",
+                        "  anomaly_density: 0.15",
+                        "  change_magnitude: 0.20",
+                        "  anomaly_coverage: 0.15",
+                        "  normal_contrast: 0.25",
+                        "  reference_context: 0.15",
+                        "  normal_context_floor: 0.10",
+                        "  length_penalty: 0.08",
+                        "  token_cost: 0.02",
+                        "allowed_kind_prefixes: random_segment",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            selected = SegmentSelector(str(config_path)).select(candidates, df, 6)
+
+        self.assertEqual(selected.selected.kind, "random_segment")
+
     def test_trace_logger_writes_expected_schema(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             df = _sample_df(20, anomaly_ranges=[(7, 9)])

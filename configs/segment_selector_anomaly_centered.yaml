@@ -1,0 +1,10 @@
+weights:
+  anomaly_density: 0.15
+  change_magnitude: 0.20
+  anomaly_coverage: 0.15
+  normal_contrast: 0.25
+  reference_context: 0.15
+  normal_context_floor: 0.10
+  length_penalty: 0.08
+  token_cost: 0.02
+allowed_kind_prefixes: short_anomaly_centered,medium_anomaly_centered,long_anomaly_centered
