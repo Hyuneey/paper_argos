@@ -911,6 +911,8 @@ class Engine(ABC):
             "segment_selection_mode": self.segment_selection_mode,
             "segment_selector_config": self.segment_selector_config,
             "selection_trace_paths": self.dataset.get_selection_trace_paths(),
+            "held_out_window_pool_path": self.dataset.get_held_out_window_pool_path(),
+            "held_out_window_pool_count": self._held_out_window_pool_count(),
             "split_stats": self.dataset.get_split_anomaly_stats(),
             "token_count": {},
         }
@@ -1119,6 +1121,8 @@ class Engine(ABC):
             "segment_selection_mode": self.segment_selection_mode,
             "segment_selector_config": self.segment_selector_config,
             "selection_trace_paths": self.dataset.get_selection_trace_paths(),
+            "held_out_window_pool_path": self.dataset.get_held_out_window_pool_path(),
+            "held_out_window_pool_count": self._held_out_window_pool_count(),
             "token_count": {},
         }
         for agent in [self.detection_agent]:
@@ -1243,6 +1247,23 @@ class Engine(ABC):
 
     def get_split_anomaly_stats(self):
         return self.dataset.get_split_anomaly_stats()
+
+    def get_held_out_window_pool(self):
+        return self.dataset.get_held_out_window_pool()
+
+    def get_held_out_window_pool_summary(self):
+        return self.dataset.get_held_out_window_pool_summary()
+
+    def get_held_out_window_pool_path(self):
+        return self.dataset.get_held_out_window_pool_path()
+
+    def _held_out_window_pool_count(self):
+        summary = self.dataset.get_held_out_window_pool_summary()
+        if isinstance(summary, list):
+            return len(summary)
+        if isinstance(summary, dict):
+            return sum(len(value) for value in summary.values() if isinstance(value, list))
+        return 0
 
     def get_rule_path(self, top_k_curr=1):
         rule_path = self.rule_file_base + f"_iter{self.cur_iter}_{top_k_curr}.py"

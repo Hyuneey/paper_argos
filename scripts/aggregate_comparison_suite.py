@@ -65,15 +65,21 @@ SUMMARY_FIELDS = [
     "mean_val_f1",
     "mean_test_f1",
     "mean_point_f1_fixed",
+    "mean_point_f1",
+    "mean_event_f1pa",
     "mean_runtime_sec",
     "mean_token_count_detection",
     "mean_prompt_rows",
     "std_val_f1",
     "std_test_f1",
     "std_point_f1_fixed",
+    "std_point_f1",
+    "std_event_f1pa",
     "ci95_val_f1",
     "ci95_test_f1",
     "ci95_point_f1_fixed",
+    "ci95_point_f1",
+    "ci95_event_f1pa",
 ]
 
 
@@ -93,6 +99,11 @@ def parse_args():
         "--output_summary_csv",
         default="results/c1_comparison_suite_summary.csv",
         help="Condition-level summary across runs.",
+    )
+    parser.add_argument(
+        "--output_delta_csv",
+        default="results/c1_comparison_suite_fixed_vs_evidence_delta.csv",
+        help="Series/chunk-level fixed-vs-evidence delta table.",
     )
     parser.add_argument(
         "--output_selected_csv",
@@ -161,6 +172,13 @@ def main():
         output_summary_csv = repo_root / output_summary_csv
     output_summary_csv.parent.mkdir(parents=True, exist_ok=True)
     _write_csv(output_summary_csv, summary_rows, row_fields=SUMMARY_FIELDS)
+
+    delta_rows = _fixed_vs_evidence_delta_rows(condition_rows)
+    output_delta_csv = Path(args.output_delta_csv)
+    if not output_delta_csv.is_absolute():
+        output_delta_csv = repo_root / output_delta_csv
+    output_delta_csv.parent.mkdir(parents=True, exist_ok=True)
+    _write_csv(output_delta_csv, delta_rows, row_fields=_delta_fields(delta_rows))
 
     selected_rows = _best_fixed_selected_rows(condition_rows)
     output_selected_csv = Path(args.output_selected_csv)
@@ -255,7 +273,19 @@ def _summarize_conditions(rows: list[dict]) -> list[dict]:
 
 
 def _summary_row(condition: str, dataset: str, rows: list[dict]) -> dict:
-    vals = {field: _numeric_list(rows, field) for field in ("val_f1", "test_f1", "point_f1_fixed", "runtime_sec", "token_count_detection", "prompt_rows")}
+    vals = {
+        field: _numeric_list(rows, field)
+        for field in (
+            "val_f1",
+            "test_f1",
+            "point_f1_fixed",
+            "point_f1",
+            "event_f1pa",
+            "runtime_sec",
+            "token_count_detection",
+            "prompt_rows",
+        )
+    }
     summary = {
         "condition": condition,
         "dataset": dataset,
@@ -263,17 +293,126 @@ def _summary_row(condition: str, dataset: str, rows: list[dict]) -> dict:
         "mean_val_f1": _mean(vals["val_f1"]),
         "mean_test_f1": _mean(vals["test_f1"]),
         "mean_point_f1_fixed": _mean(vals["point_f1_fixed"]),
+        "mean_point_f1": _mean(vals["point_f1"]),
+        "mean_event_f1pa": _mean(vals["event_f1pa"]),
         "mean_runtime_sec": _mean(vals["runtime_sec"]),
         "mean_token_count_detection": _mean(vals["token_count_detection"]),
         "mean_prompt_rows": _mean(vals["prompt_rows"]),
         "std_val_f1": _std(vals["val_f1"]),
         "std_test_f1": _std(vals["test_f1"]),
         "std_point_f1_fixed": _std(vals["point_f1_fixed"]),
+        "std_point_f1": _std(vals["point_f1"]),
+        "std_event_f1pa": _std(vals["event_f1pa"]),
         "ci95_val_f1": _ci95(vals["val_f1"]),
         "ci95_test_f1": _ci95(vals["test_f1"]),
         "ci95_point_f1_fixed": _ci95(vals["point_f1_fixed"]),
+        "ci95_point_f1": _ci95(vals["point_f1"]),
+        "ci95_event_f1pa": _ci95(vals["event_f1pa"]),
     }
     return summary
+
+
+def _fixed_vs_evidence_delta_rows(rows: list[dict]) -> list[dict]:
+    grouped = defaultdict(lambda: defaultdict(list))
+    for row in rows:
+        condition = row.get("condition")
+        if condition not in {"fixed", "evidence"}:
+            continue
+        key = (row.get("dataset"), row.get("series"), row.get("chunk_size"))
+        grouped[key][condition].append(row)
+
+    delta_rows = []
+    for (dataset, series, chunk_size), by_condition in sorted(grouped.items(), key=lambda item: item[0]):
+        fixed_rows = by_condition.get("fixed", [])
+        evidence_rows = by_condition.get("evidence", [])
+        if not fixed_rows or not evidence_rows:
+            continue
+
+        fixed_stats = _mean_row_metrics(fixed_rows)
+        evidence_stats = _mean_row_metrics(evidence_rows)
+        delta_rows.append(
+            {
+                "dataset": dataset,
+                "series": series,
+                "chunk_size": chunk_size,
+                "fixed_rows": len(fixed_rows),
+                "evidence_rows": len(evidence_rows),
+                "fixed_point_f1_fixed": fixed_stats["point_f1_fixed"],
+                "evidence_point_f1_fixed": evidence_stats["point_f1_fixed"],
+                "delta_point_f1_fixed": _delta(fixed_stats["point_f1_fixed"], evidence_stats["point_f1_fixed"]),
+                "fixed_point_f1": fixed_stats["point_f1"],
+                "evidence_point_f1": evidence_stats["point_f1"],
+                "delta_point_f1": _delta(fixed_stats["point_f1"], evidence_stats["point_f1"]),
+                "fixed_event_f1pa": fixed_stats["event_f1pa"],
+                "evidence_event_f1pa": evidence_stats["event_f1pa"],
+                "delta_event_f1pa": _delta(fixed_stats["event_f1pa"], evidence_stats["event_f1pa"]),
+                "fixed_runtime_sec": fixed_stats["runtime_sec"],
+                "evidence_runtime_sec": evidence_stats["runtime_sec"],
+                "delta_runtime_sec": _delta(fixed_stats["runtime_sec"], evidence_stats["runtime_sec"]),
+                "fixed_token_count_detection": fixed_stats["token_count_detection"],
+                "evidence_token_count_detection": evidence_stats["token_count_detection"],
+                "delta_token_count_detection": _delta(
+                    fixed_stats["token_count_detection"], evidence_stats["token_count_detection"]
+                ),
+                "fixed_prompt_rows": fixed_stats["prompt_rows"],
+                "evidence_prompt_rows": evidence_stats["prompt_rows"],
+                "delta_prompt_rows": _delta(fixed_stats["prompt_rows"], evidence_stats["prompt_rows"]),
+            }
+        )
+    return delta_rows
+
+
+def _mean_row_metrics(rows: list[dict]) -> dict[str, float | None]:
+    return {
+        field: _mean(_numeric_list(rows, field))
+        for field in ("point_f1_fixed", "point_f1", "event_f1pa", "runtime_sec", "token_count_detection", "prompt_rows")
+    }
+
+
+def _delta(left: float | None, right: float | None) -> float | None:
+    if left is None or right is None:
+        return None
+    return left - right
+
+
+def _delta_fields(rows: list[dict]) -> list[str]:
+    preferred = [
+        "dataset",
+        "series",
+        "chunk_size",
+        "fixed_rows",
+        "evidence_rows",
+        "fixed_point_f1_fixed",
+        "evidence_point_f1_fixed",
+        "delta_point_f1_fixed",
+        "fixed_point_f1",
+        "evidence_point_f1",
+        "delta_point_f1",
+        "fixed_event_f1pa",
+        "evidence_event_f1pa",
+        "delta_event_f1pa",
+        "fixed_runtime_sec",
+        "evidence_runtime_sec",
+        "delta_runtime_sec",
+        "fixed_token_count_detection",
+        "evidence_token_count_detection",
+        "delta_token_count_detection",
+        "fixed_prompt_rows",
+        "evidence_prompt_rows",
+        "delta_prompt_rows",
+    ]
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for field in preferred:
+        if any(field in row for row in rows) and field not in seen:
+            ordered.append(field)
+            seen.add(field)
+    for row in rows:
+        for field in row.keys():
+            if field not in seen:
+                ordered.append(field)
+                seen.add(field)
+    return ordered
 
 
 def _best_fixed_selected_rows(rows: list[dict]) -> list[dict]:

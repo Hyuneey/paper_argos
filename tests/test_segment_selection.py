@@ -43,6 +43,28 @@ class SegmentSelectionTests(unittest.TestCase):
             self.assertTrue(dataset.get_selection_trace_paths())
             self.assertTrue(list(Path(tmpdir).glob("selection_trace_iter_*.json")))
 
+    def test_held_out_window_pool_summarizes_validation_chunks(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "series.csv"
+            _sample_df(20, anomaly_ranges=[(13, 15)]).to_csv(path, index=False)
+
+            dataset = ArgosDataset(
+                str(path),
+                chunk_size=2,
+                train_test_split=0.8,
+                val_split=0.25,
+                selection_trace_dir=tmpdir,
+            )
+
+            pool = dataset.get_held_out_window_pool()
+            summary = dataset.get_held_out_window_pool_summary()
+
+            self.assertEqual(sorted(pool.keys()), [0, 1])
+            self.assertEqual(len(summary), 2)
+            self.assertTrue(all(item["split"] == "val" for item in summary))
+            self.assertEqual(summary[0]["total_points"], len(pool[0]))
+            self.assertTrue(Path(tmpdir, "held_out_window_pool.json").exists())
+
     def test_candidate_generator_handles_edges_and_no_anomaly(self):
         df = _sample_df(12, anomaly_ranges=[(0, 2), (10, 12)])
         candidates = generate_candidates(df, chunk_size=6, iter_num=1)
@@ -193,13 +215,18 @@ class SegmentSelectionTests(unittest.TestCase):
                 call_id=0,
                 random_seed=8,
                 config_path=None,
+                provenance={"source_split": "train", "source_chunk_id": 0, "segment_selection_mode": "evidence"},
             )
 
             payload = json.loads(Path(trace_path).read_text(encoding="utf-8"))
+            self.assertIn("provenance", payload)
             self.assertIn("selected_segment", payload)
             self.assertIn("selection_score", payload)
             self.assertIn("candidate_scores", payload)
             self.assertTrue(payload["oracle_like_analysis_setting"])
+            self.assertEqual(payload["provenance"]["source_split"], "train")
+            self.assertEqual(payload["provenance"]["source_chunk_id"], 0)
+            self.assertEqual(payload["provenance"]["segment_selection_mode"], "evidence")
 
 
 def _sample_df(length, anomaly_ranges=None):

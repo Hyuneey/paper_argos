@@ -48,6 +48,9 @@ class ArgosDataset(ABC):
         self.selection_call_count = 0
         self.selection_trace_paths = []
         self.last_selection_reference_df = None
+        self.held_out_window_pool = None
+        self.held_out_window_pool_summary = None
+        self.held_out_window_pool_path = None
         self.skip_training = False
         if self.segment_selection_mode not in {"fixed", "evidence"}:
             raise ValueError(
@@ -113,6 +116,7 @@ class ArgosDataset(ABC):
             self.train_dict = self.split_df_by_chunk(self.train_df, self.chunk_size)
             self.val_dict = self.split_df_by_chunk(self.val_df, self.chunk_size)
             self.test_dict = self.split_df_by_chunk(self.test_df, self.chunk_size)
+            self._build_held_out_window_pool()
             if self.image_chunk_size:
                 self.train_dict_image = self.split_df_by_chunk(
                     self.train_df, self.image_chunk_size
@@ -470,6 +474,23 @@ class ArgosDataset(ABC):
             candidates, self.train_df, self.chunk_size
         )
         self.last_selection_reference_df = self._selection_reference_df(selection)
+        provenance = {
+            "dataset_path": self.dataset_path,
+            "dataset_mode": self.dataset_mode,
+            "segment_selection_mode": self.segment_selection_mode,
+            "chunk_size": self.chunk_size,
+            "train_test_split": self.train_test_split,
+            "val_split": self.val_split,
+            "source_split": "train",
+            "source_chunk_id": chunk_id,
+            "source_chunk_start_pos": int(fixed_df.index.min()) if len(fixed_df) else None,
+            "source_chunk_end_pos": int(fixed_df.index.max()) if len(fixed_df) else None,
+            "candidate_pool_size": len(selection.candidate_scores),
+            "selected_candidate_type": selection.selected.kind,
+            "selected_start_pos": selection.selected.start_pos,
+            "selected_end_pos": selection.selected.end_pos,
+            "has_reference_segment": selection.selected.reference_segment is not None,
+        }
         trace_path = write_selection_trace(
             selection,
             self.selection_trace_dir,
@@ -477,6 +498,7 @@ class ArgosDataset(ABC):
             call_id=self.selection_call_count,
             random_seed=self.selection_random_seed,
             config_path=self.segment_selector_config,
+            provenance=provenance,
         )
         self.selection_call_count += 1
         if trace_path:
@@ -692,32 +714,126 @@ class ArgosDataset(ABC):
     def get_segment_selection_mode(self):
         return self.segment_selection_mode
 
-    def get_model_test_labels(self, curve_name=None):
-        assert (
-            self.engine_mode == "train-combined-fn"
-            or self.engine_mode == "train-combined-fp"
-        ), "This method is only for combined mode"
-        assert self.model_test_label_dict is not None, "Model test labels are not set"
-        if curve_name is not None:
-            return self.model_test_label_dict[curve_name]
-        else:
-            assert len(self.model_test_label_dict) == 1
-            return self.model_test_label_dict.popitem()[1]
+    def get_held_out_window_pool(self):
+        return self.held_out_window_pool
 
-    def get_model_train_labels(self, curve_name=None):
-        assert (
-            self.engine_mode == "train-combined-fn"
-            or self.engine_mode == "train-combined-fp"
-        ), "This method is only for combined mode"
-        assert self.model_train_label_dict is not None, "Model train labels are not set"
-        if curve_name is not None:
-            return self.model_train_label_dict[curve_name]
-        else:
-            assert len(self.model_train_label_dict) == 1
-            return self.model_train_label_dict.popitem()[1]
+    def get_held_out_window_pool_summary(self):
+        return self.held_out_window_pool_summary
 
-    def get_dataset_dict(self):
-        assert (
-            self.dataset_mode == "all-in-one"
-        ), "This method is only for all-in-one dataset"
-        return self.dataset_dict
+    def get_held_out_window_pool_path(self):
+        return self.held_out_window_pool_path
+
+    def _build_held_out_window_pool(self):
+        if self.dataset_mode == "one-by-one":
+            self.held_out_window_pool = self.split_df_by_chunk(self.val_df, self.chunk_size)
+            self.held_out_window_pool_summary = self._summarize_window_pool(
+                self.held_out_window_pool, split_name="val"
+            )
+        elif self.dataset_mode == "all-in-one":
+            pool = {}
+            summary = {}
+            for dataset_name, (_train_df, _test_df, val_df) in self.dataset_dict.items():
+                dataset_pool = self.split_df_by_chunk(val_df, self.chunk_size)
+                pool[dataset_name] = dataset_pool
+                summary[dataset_name] = self._summarize_window_pool(
+                    dataset_pool, split_name="val"
+                )
+            self.held_out_window_pool = pool
+            self.held_out_window_pool_summary = summary
+        else:
+            raise NotImplementedError(
+                "Held-out window pools only support one-by-one/all-in-one datasets"
+            )
+
+        if self.selection_trace_dir:
+            self.held_out_window_pool_path = os.path.join(
+                self.selection_trace_dir, "held_out_window_pool.json"
+            )
+            self._write_held_out_window_pool_summary()
+
+    def _write_held_out_window_pool_summary(self):
+        if self.held_out_window_pool_path is None:
+            return
+        payload = {
+            "dataset_path": self.dataset_path,
+            "dataset_mode": self.dataset_mode,
+            "chunk_size": self.chunk_size,
+            "train_test_split": self.train_test_split,
+            "val_split": self.val_split,
+            "pool": self.held_out_window_pool_summary,
+        }
+        with open(self.held_out_window_pool_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+
+    def _summarize_window_pool(self, window_pool, split_name: str):
+        if not window_pool:
+            return []
+        summary = []
+        for chunk_id, window_df in window_pool.items():
+            summary.append(
+                {
+                    "split": split_name,
+                    "chunk_id": chunk_id,
+                    "start_pos": int(window_df.index.min()) if len(window_df) else None,
+                    "end_pos": int(window_df.index.max()) if len(window_df) else None,
+                    "total_points": int(len(window_df)),
+                    "anomaly_point_count": int(window_df["label"].sum())
+                    if "label" in window_df
+                    else 0,
+                    "anomaly_event_count": self._count_anomaly_events(
+                        window_df["label"].to_numpy()
+                    )
+                    if "label" in window_df
+                    else 0,
+                    "anomaly_point_ratio": float(window_df["label"].sum()) / len(window_df)
+                    if len(window_df) and "label" in window_df
+                    else 0.0,
+                    "anomaly_event_ratio": self._count_anomaly_events(
+                        window_df["label"].to_numpy()
+                    )
+                    / len(window_df)
+                    if len(window_df) and "label" in window_df
+                    else 0.0,
+                }
+            )
+        return summary
+
+    def get_split_anomaly_stats(self):
+        """Return anomaly point/event counts for train/val/test splits.
+
+        The returned structure is nested so callers can persist it directly in
+        metadata/stats JSON and flatten it only at aggregation time.
+        """
+
+        if self.dataset_mode == "one-by-one":
+            train_stats = self._split_anomaly_stats(self.train_df)
+            val_stats = self._split_anomaly_stats(self.val_df)
+            test_stats = self._split_anomaly_stats(self.test_df)
+            return {
+                "train": train_stats,
+                "val": val_stats,
+                "test": test_stats,
+                "flags": {
+                    "test_event_count_lt_5": test_stats["anomaly_event_count"] < 5,
+                    "test_anomaly_point_count_lt_5": test_stats["anomaly_point_count"] < 5,
+                },
+            }
+
+        if self.dataset_mode == "all-in-one":
+            stats = {}
+            for dataset_name, (train_df, test_df, val_df) in self.dataset_dict.items():
+                train_stats = self._split_anomaly_stats(train_df)
+                val_stats = self._split_anomaly_stats(val_df)
+                test_stats = self._split_anomaly_stats(test_df)
+                stats[dataset_name] = {
+                    "train": train_stats,
+                    "val": val_stats,
+                    "test": test_stats,
+                    "flags": {
+                        "test_event_count_lt_5": test_stats["anomaly_event_count"] < 5,
+                        "test_anomaly_point_count_lt_5": test_stats["anomaly_point_count"] < 5,
+                    },
+                }
+            return stats
+
+        raise NotImplementedError("Split stats only support one-by-one/all-in-one datasets")

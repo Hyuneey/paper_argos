@@ -20,6 +20,7 @@ from common.common import (calculate_performance, cleanup_global_env,
 from common.exception import (RuntimeException, SyntaxException,
                               TimeoutException)
 from datasets.dataset import ArgosDataset
+from eval_metrics.affiliation_f1 import AffiliationF1
 from eval_metrics.event_f1pa import EventF1PA
 from eval_metrics.point_f1 import PointF1
 from eval_metrics.point_f1_fixed import PointF1Fixed
@@ -490,12 +491,16 @@ class ReviewAgent(Agent):
         eval_interface = EventF1PA(mode="squeeze")
         eval_res_ef1pa = eval_interface.calc(scores, gt_labels, None)
 
+        eval_interface = AffiliationF1()
+        eval_res_affiliation = eval_interface.calc(scores, gt_labels, None)
+
         if log:
             logging.info(report)
             logging.info(eval_res_pf1.to_dict())
             logging.info(eval_res_pf1_fixed.to_dict())
             logging.info(eval_res_pf1pa.to_dict())
             logging.info(eval_res_ef1pa.to_dict())
+            logging.info(eval_res_affiliation.to_dict())
 
         # combine 3 dicts in to a final_res_dict
         final_res_dict = {
@@ -503,6 +508,7 @@ class ReviewAgent(Agent):
             **eval_res_pf1_fixed.to_dict(),
             **eval_res_pf1pa.to_dict(),
             **eval_res_ef1pa.to_dict(),
+            **eval_res_affiliation.to_dict(),
         }
         return final_res_dict
 

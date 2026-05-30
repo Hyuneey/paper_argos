@@ -12,6 +12,7 @@ def write_selection_trace(
     call_id: int,
     random_seed: int,
     config_path: str | None,
+    provenance: dict | None = None,
 ) -> str | None:
     if not trace_dir:
         return None
@@ -22,6 +23,7 @@ def write_selection_trace(
     trace = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "oracle_like_analysis_setting": True,
+        "provenance": provenance or {},
         "selected_segment": {
             "candidate_type": selected.kind,
             "start_pos": selected.start_pos,
