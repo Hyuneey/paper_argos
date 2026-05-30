@@ -127,12 +127,14 @@ def aggregate_run(run_dir: Path) -> dict | None:
     repeat_id = _parse_repeat_id(run_dir) or metadata.get("repeat_id")
 
     rule_path = _resolve_best_rule_path(run_dir, stats)
-    train_eval = _read_eval_for_rule(rule_path, "train") or _best_eval(run_dir, "train")
-    val_eval = _read_eval_for_rule(rule_path, "val") or _best_eval(run_dir, "val")
-    test_eval = _read_eval_for_rule(rule_path, "test") or _best_eval(run_dir, "test")
+    if rule_path is None:
+        return None
+    train_eval = _read_eval_for_rule(rule_path, "train")
+    val_eval = _read_eval_for_rule(rule_path, "val")
+    test_eval = _read_eval_for_rule(rule_path, "test")
     if not test_eval:
         return None
-    rule_text = rule_path.read_text(encoding="utf-8") if rule_path and rule_path.exists() else ""
+    rule_text = rule_path.read_text(encoding="utf-8") if rule_path.exists() else ""
     densities = _trace_densities(run_dir)
 
     train_f1 = _metric_value(train_eval, "f1")
@@ -216,6 +218,10 @@ def _resolve_best_rule_path(run_dir: Path, stats: dict) -> Path | None:
             if candidate.exists():
                 return candidate
 
+    best_by_val = _best_rule_path_by_val(run_dir)
+    if best_by_val is not None:
+        return best_by_val
+
     rules = sorted(run_dir.glob("rule*.py"))
     return rules[-1] if rules else None
 
@@ -226,12 +232,18 @@ def _read_eval_for_rule(rule_path: Path | None, split: str) -> dict:
     return _read_json(rule_path.with_name(rule_path.stem + f"_eval_res_{split}.json"))
 
 
-def _best_eval(run_dir: Path, split: str) -> dict:
-    evals = [_read_json(path) for path in run_dir.glob(f"*eval_res_{split}.json")]
-    evals = [item for item in evals if item]
-    if not evals:
-        return {}
-    return max(evals, key=lambda item: _metric_value(item, "f1") or 0.0)
+def _best_rule_path_by_val(run_dir: Path) -> Path | None:
+    best_rule = None
+    best_val = None
+    for rule_path in sorted(run_dir.glob("rule*.py")):
+        val_eval = _read_eval_for_rule(rule_path, "val")
+        val_f1 = _metric_value(val_eval, "f1")
+        if val_f1 is None:
+            continue
+        if best_val is None or val_f1 > best_val:
+            best_val = val_f1
+            best_rule = rule_path
+    return best_rule
 
 
 def _metric_block(metrics: dict, name: str) -> dict:

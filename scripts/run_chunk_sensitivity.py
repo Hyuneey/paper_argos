@@ -123,13 +123,28 @@ def main():
                 attempt_log_path = run_dir / f"driver_stdout_attempt_{attempt_id:02d}.log"
                 with open(attempt_log_path, "w", encoding="utf-8") as log_file:
                     try:
+                        child_env = os.environ.copy()
+                        for key in (
+                            "OPENAI_API_KEY",
+                            "ARGOS_OPENAI_OAUTH_TOKEN",
+                            "OPENAI_OAUTH_TOKEN",
+                            "ARGOS_CODEX_AUTH_PATH",
+                            "OPENAI_BASE_URL",
+                            "ARGOS_OPENAI_BASE_URL",
+                            "OPENAI_AZURE_API_KEY",
+                            "OPENAI_AZURE_ENDPOINT",
+                            "OPENAI_AZURE_API_VERSION",
+                        ):
+                            value = os.environ.get(key)
+                            if value is not None:
+                                child_env[key] = value
                         subprocess.run(
                             command,
                             cwd=repo_root,
                             stdout=log_file,
                             stderr=subprocess.STDOUT,
                             check=True,
-                            env=os.environ.copy(),
+                            env=child_env,
                         )
                         shutil.copyfile(attempt_log_path, log_path)
                         last_error = None

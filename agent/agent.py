@@ -14,6 +14,7 @@ import time
 import random
 import tempfile
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 from openai import AzureOpenAI, OpenAI
 
@@ -57,10 +58,10 @@ class LLM:
         temperature = float(os.environ.get("ARGOS_LLM_TEMPERATURE", str(temperature)))
         # list of tuple of (input_token_count, output_token_count)
         self.input_output_token_count = []
-
+        self._token_count_lock = threading.Lock()
 
         self._thread_local = threading.local()
-        
+
         self.parameters = {
             "model": self.engine,
             "temperature": temperature,
@@ -238,6 +239,11 @@ class LLM:
                 output_path,
                 "-",
             ]
+            codex_env = os.environ.copy()
+            auth_path = _resolve_codex_auth_path()
+            if auth_path is not None:
+                codex_env["ARGOS_CODEX_AUTH_PATH"] = auth_path
+                codex_env["CODEX_HOME"] = str(Path(auth_path).parent)
             completed = subprocess.run(
                 command,
                 input=prompt,
@@ -246,6 +252,7 @@ class LLM:
                 encoding="utf-8",
                 errors="replace",
                 timeout=TIMEOUT_LLM,
+                env=codex_env,
             )
             if completed.returncode != 0:
                 raise RuntimeError(
@@ -301,13 +308,11 @@ def _messages_to_codex_prompt(messages) -> str:
 
 def _assert_codex_oauth_available() -> None:
     # Do not read token contents here. Codex CLI handles ChatGPT OAuth via CODEX_HOME.
-    auth_path = os.environ.get(
-        "ARGOS_CODEX_AUTH_PATH",
-        os.path.join(os.path.expanduser("~"), ".codex", "auth.json"),
-    )
-    if not os.path.exists(auth_path):
+    auth_path = _resolve_codex_auth_path()
+    if auth_path is None:
         raise RuntimeError(
-            "chatgpt-oauth provider requires a Codex/ChatGPT login at ~/.codex/auth.json."
+            "chatgpt-oauth provider requires a Codex/ChatGPT login at ~/.codex/auth.json "
+            "or a discoverable Windows-mirrored auth.json under /mnt/c/Users/*/.codex/."
         )
 
 
@@ -318,10 +323,13 @@ def _load_oauth_access_token() -> str:
     if token:
         return token
 
-    auth_path = os.environ.get(
-        "ARGOS_CODEX_AUTH_PATH",
-        os.path.join(os.path.expanduser("~"), ".codex", "auth.json"),
-    )
+    auth_path = _resolve_codex_auth_path()
+    if auth_path is None:
+        raise RuntimeError(
+            "ChatGPT OAuth provider requires ARGOS_OPENAI_OAUTH_TOKEN, "
+            "OPENAI_OAUTH_TOKEN, or tokens.access_token in a discoverable auth.json."
+        )
+
     with open(auth_path, "r", encoding="utf-8") as f:
         auth = json.load(f)
 
@@ -332,6 +340,23 @@ def _load_oauth_access_token() -> str:
             "OPENAI_OAUTH_TOKEN, or tokens.access_token in ~/.codex/auth.json."
         )
     return token
+
+
+def _resolve_codex_auth_path() -> str | None:
+    env_path = os.environ.get("ARGOS_CODEX_AUTH_PATH")
+    if env_path and os.path.exists(env_path):
+        return env_path
+
+    home_path = os.path.join(os.path.expanduser("~"), ".codex", "auth.json")
+    if os.path.exists(home_path):
+        return home_path
+
+    windows_candidates = sorted(Path("/mnt/c/Users").glob("*/.codex/auth.json"))
+    for candidate in windows_candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    return None
 
 
 def _is_non_retryable_llm_error(error: Exception) -> bool:

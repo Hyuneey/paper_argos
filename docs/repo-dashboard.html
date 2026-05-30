@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang='ko'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Argos Repo Dashboard</title>
+<link href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap' rel='stylesheet'>
+<style>
+
+        :root {
+          color-scheme: dark;
+          --bg: #08090a;
+          --panel: #0f1011;
+          --surface: #191a1b;
+          --surface-2: #212225;
+          --line: rgba(255,255,255,.08);
+          --line-soft: rgba(255,255,255,.05);
+          --text: #f7f8f8;
+          --text-2: #d0d6e0;
+          --muted: #8a8f98;
+          --quiet: #62666d;
+          --accent: #7170ff;
+          --accent-2: #828fff;
+          --success: #27a644;
+          --warning: #f5a524;
+          --danger: #ef6b6b;
+          --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+          --sans: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        html, body { min-height: 100%; }
+        body {
+          margin: 0;
+          background:
+            radial-gradient(circle at top left, rgba(113,112,255,.12), transparent 30%),
+            radial-gradient(circle at 80% 0%, rgba(39,166,68,.08), transparent 18%),
+            var(--bg);
+          color: var(--text);
+          font-family: var(--sans);
+          font-feature-settings: 'cv01' 1, 'ss03' 1;
+          -webkit-font-smoothing: antialiased;
+          text-rendering: geometricPrecision;
+        }
+        a { color: inherit; text-decoration: none; }
+        .shell {
+          max-width: 1500px;
+          margin: 0 auto;
+          padding: 28px 24px 40px;
+        }
+        .hero {
+          display: grid;
+          gap: 18px;
+          grid-template-columns: 1.35fr .65fr;
+          align-items: stretch;
+          margin-bottom: 18px;
+        }
+        .panel {
+          background: rgba(255,255,255,.03);
+          border: 1px solid var(--line);
+          box-shadow: 0 0 0 1px rgba(0,0,0,.15), 0 16px 40px rgba(0,0,0,.25);
+          border-radius: 18px;
+        }
+        .hero-main {
+          padding: 28px;
+          position: relative;
+          overflow: hidden;
+        }
+        .hero-main::after {
+          content: '';
+          position: absolute;
+          inset: -2px;
+          background: linear-gradient(120deg, transparent, rgba(113,112,255,.06), transparent 60%);
+          pointer-events: none;
+        }
+        .eyebrow {
+          display: inline-flex;
+          gap: 8px;
+          align-items: center;
+          color: var(--muted);
+          font-size: 12px;
+          letter-spacing: .08em;
+          text-transform: uppercase;
+          margin-bottom: 14px;
+        }
+        .title {
+          margin: 0;
+          font-size: clamp(34px, 5vw, 64px);
+          line-height: .94;
+          letter-spacing: -0.05em;
+          font-weight: 600;
+          max-width: 12ch;
+        }
+        .subtitle {
+          margin: 14px 0 0;
+          max-width: 70ch;
+          color: var(--text-2);
+          font-size: 15px;
+          line-height: 1.7;
+        }
+        .hero-side {
+          display: grid;
+          gap: 12px;
+        }
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+        .summary-card, .mini-panel, .dir-card, .doc-card, .run-card, .commit-card {
+          background: rgba(255,255,255,.025);
+          border: 1px solid var(--line-soft);
+          border-radius: 16px;
+        }
+        .summary-card {
+          padding: 14px 14px 16px;
+          min-height: 108px;
+        }
+        .summary-label {
+          color: var(--muted);
+          font-size: 12px;
+          margin-bottom: 10px;
+          text-transform: uppercase;
+          letter-spacing: .08em;
+        }
+        .summary-value {
+          font-size: 22px;
+          line-height: 1.1;
+          font-weight: 600;
+          letter-spacing: -0.04em;
+        }
+        .summary-meta {
+          margin-top: 8px;
+          color: var(--quiet);
+          font-size: 12px;
+        }
+        .mini-panel {
+          padding: 14px;
+        }
+        .mini-title {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+        .mini-title h2, .section-head h2 {
+          margin: 0;
+          font-size: 15px;
+          font-weight: 600;
+          letter-spacing: -0.02em;
+        }
+        .mini-title span, .section-head span {
+          color: var(--muted);
+          font-size: 12px;
+        }
+        .searchbar {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 14px 16px;
+          margin: 18px 0;
+          background: rgba(255,255,255,.022);
+          border: 1px solid var(--line);
+          border-radius: 16px;
+        }
+        .searchbar input {
+          width: 100%;
+          background: transparent;
+          border: 0;
+          outline: none;
+          color: var(--text);
+          font: inherit;
+          font-size: 15px;
+        }
+        .searchbar input::placeholder { color: var(--quiet); }
+        .chip-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 10px;
+        }
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid var(--line-soft);
+          color: var(--text-2);
+          font-size: 12px;
+          line-height: 1;
+        }
+        .badge-accent { background: rgba(113,112,255,.11); color: #d9dbff; border-color: rgba(113,112,255,.35); }
+        .badge-ok { background: rgba(39,166,68,.12); color: #d7f7df; border-color: rgba(39,166,68,.35); }
+        .badge-warn { background: rgba(245,165,36,.12); color: #ffe7ba; border-color: rgba(245,165,36,.35); }
+        .badge-danger { background: rgba(239,107,107,.12); color: #ffd5d5; border-color: rgba(239,107,107,.35); }
+        .badge-quiet { background: rgba(255,255,255,.02); color: var(--text-2); }
+        .section {
+          margin-top: 18px;
+          padding: 18px;
+        }
+        .section-head {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+        .section-head .section-sub {
+          color: var(--muted);
+          font-size: 12px;
+        }
+        .grid-structure {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+        }
+        .dir-card {
+          padding: 14px;
+          min-height: 150px;
+          position: relative;
+          overflow: hidden;
+        }
+        .dir-card::before {
+          content: '';
+          position: absolute;
+          inset: 0 auto auto 0;
+          width: 100%;
+          height: 3px;
+          background: linear-gradient(90deg, var(--accent), rgba(113,112,255,.15));
+          opacity: .35;
+        }
+        .dir-top {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: flex-start;
+        }
+        .dir-name {
+          font-size: 18px;
+          font-weight: 600;
+          letter-spacing: -0.03em;
+          margin: 0;
+        }
+        .dir-note {
+          margin-top: 6px;
+          color: var(--text-2);
+          font-size: 13px;
+          line-height: 1.55;
+        }
+        .dir-meta {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          margin-top: 12px;
+        }
+        .dir-stat {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 10px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.02);
+          border: 1px solid var(--line-soft);
+          color: var(--text-2);
+          font-size: 12px;
+        }
+        .progress {
+          margin-top: 12px;
+          height: 7px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.05);
+          overflow: hidden;
+        }
+        .progress > span {
+          display: block;
+          height: 100%;
+          border-radius: inherit;
+          background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        }
+        .updates-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+        .stack {
+          display: grid;
+          gap: 10px;
+        }
+        .doc-card, .run-card, .commit-card {
+          padding: 14px;
+        }
+        .doc-head, .run-head, .commit-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .doc-title, .run-title {
+          margin: 0;
+          font-size: 15px;
+          font-weight: 600;
+          line-height: 1.35;
+        }
+        .doc-path, .run-path, .commit-path {
+          margin-top: 4px;
+          color: var(--muted);
+          font-size: 12px;
+          word-break: break-all;
+        }
+        .doc-summary, .run-summary, .commit-summary {
+          margin-top: 10px;
+          color: var(--text-2);
+          font-size: 13px;
+          line-height: 1.6;
+        }
+        .mono { font-family: var(--mono); }
+        .run-kpis {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 10px;
+        }
+        .run-grid {
+          display: grid;
+          gap: 12px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .footer {
+          margin-top: 20px;
+          color: var(--muted);
+          font-size: 12px;
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+          padding: 0 4px;
+        }
+        @media (max-width: 1180px) {
+          .hero, .updates-grid, .run-grid, .grid-structure { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 720px) {
+          .shell { padding: 16px; }
+          .hero-main, .section { padding: 16px; }
+          .summary-grid { grid-template-columns: 1fr; }
+          .title { max-width: unset; }
+        }
+        
+</style>
+</head>
+<body>
+<div class='shell'>
+<div class='hero'>
+<section class='panel hero-main'>
+<div class='eyebrow'><span class='badge badge-accent'>LIVE SNAPSHOT</span><span>Argos repository dashboard</span></div>
+<h1 class='title'>Code structure, updates, and experiment pulse — at a glance.</h1>
+<p class='subtitle'>This dashboard is generated from the current repo state. It surfaces the architecture map, recently changed files, fresh notes, and the latest experiment runs so you can keep orientation while other work is still running in the background.</p>
+<div class='chip-row'><span class="badge badge-quiet">Repo: argos</span><span class="badge badge-quiet">Total tracked area: 1.5K files</span><span class="badge badge-quiet">Last refresh: 2026-05-30 12:58</span><span class="badge badge-accent">Linear-style dark UI</span></div>
+</section>
+<aside class='hero-side'>
+<div class='panel mini-panel'>
+<div class='mini-title'><h2>Repository pulse</h2><span>current state</span></div>
+<div class='summary-grid'>
+<div class='summary-card'><div class='summary-label'>Branch</div><div class='summary-value'>main...paper/main</div><div class='summary-meta'><span class="badge badge-quiet">status</span></div></div>
+<div class='summary-card'><div class='summary-label'>Dirty files</div><div class='summary-value'>11</div><div class='summary-meta'><span class="badge badge-warn">status</span></div></div>
+<div class='summary-card'><div class='summary-label'>Modified areas</div><div class='summary-value'>6</div><div class='summary-meta'><span class="badge badge-accent">status</span></div></div>
+<div class='summary-card'><div class='summary-label'>Active runs</div><div class='summary-value'>0</div><div class='summary-meta'><span class="badge badge-quiet">status</span></div></div>
+</div>
+</div>
+<div class='panel mini-panel'>
+<div class='mini-title'><h2>Git change radar</h2><span>top scopes</span></div>
+<div class='subtitle' style='margin:0;color:var(--text-2)'>agent×4, scripts×2, tests×2, runtime×1, segment_selection×1, docs×1</div>
+</div>
+</aside>
+</div>
+<div class='searchbar panel'>
+<span class='badge badge-quiet'>/</span>
+<input id='filter' type='text' placeholder='Filter structure, updates, runs, or file paths…'>
+<span class='badge badge-quiet'>Cmd/Ctrl + K vibe</span>
+</div>
+<section class='panel section'>
+<div class='section-head'><h2>Structure map</h2><span class='section-sub'>Where the repo lives, how big each area is, and which parts are moving.</span></div>
+<div class='grid-structure'>
+<article class='dir-card filterable' data-search='agent llm agents, prompts, and orchestration logic 14 4 agent'><div class='dir-top'><div><h3 class='dir-name'>agent</h3><div class='dir-note'>LLM agents, prompts, and orchestration logic</div></div><span class="badge badge-accent">changed</span></div><div class='dir-meta'><span class='dir-stat mono'>14 files</span><span class='dir-stat mono'>2026-05-30 12:31</span><span class='dir-stat mono'>4 touched</span></div><div class='progress' aria-hidden='true'><span style='width:14%' ></span></div></article>
+<article class='dir-card filterable' data-search='baseline baseline implementations and comparators 6 0 baseline'><div class='dir-top'><div><h3 class='dir-name'>baseline</h3><div class='dir-note'>Baseline implementations and comparators</div></div><span class="badge badge-ok">stable</span></div><div class='dir-meta'><span class='dir-stat mono'>6 files</span><span class='dir-stat mono'>2026-05-30 09:16</span><span class='dir-stat mono'>0 touched</span></div><div class='progress' aria-hidden='true'><span style='width:9%' ></span></div></article>
+<article class='dir-card filterable' data-search='common shared utilities and helpers 2 0 common'><div class='dir-top'><div><h3 class='dir-name'>common</h3><div class='dir-note'>Shared utilities and helpers</div></div><span class="badge badge-ok">stable</span></div><div class='dir-meta'><span class='dir-stat mono'>2 files</span><span class='dir-stat mono'>2026-05-30 00:08</span><span class='dir-stat mono'>0 touched</span></div><div class='progress' aria-hidden='true'><span style='width:8%' ></span></div></article>
+<article class='dir-card filterable' data-search='config runtime config loader and defaults 2 0 config'><div class='dir-top'><div><h3 class='dir-name'>config</h3><div class='dir-note'>Runtime config loader and defaults</div></div><span class="badge badge-ok">stable</span></div><div class='dir-meta'><span class='dir-stat mono'>2 files</span><span class='dir-stat mono'>2026-05-28 22:06</span><span class='dir-stat mono'>0 touched</span></div><div class='progress' aria-hidden='true'><span style='width:8%' ></span></div></article>
+<article class='dir-card filterable' data-search='configs yaml selector / experiment configs 1 0 configs'><div class='dir-top'><div><h3 class='dir-name'>configs</h3><div class='dir-note'>YAML selector / experiment configs</div></div><span class="badge badge-ok">stable</span></div><div class='dir-meta'><span class='dir-stat mono'>1 files</span><span class='dir-stat mono'>2026-05-30 09:36</span><span class='dir-stat mono'>0 touched</span></div><div class='progress' aria-hidden='true'><span style='width:8%' ></span></div></article>
+<article class='dir-card filterable' data-search='datasets dataset abstractions and loaders 9 0 datasets'><div class='dir-top'><div><h3 class='dir-name'>datasets</h3><div class='dir-note'>Dataset abstractions and loaders</div></div><span class="badge badge-ok">stable</span></div><div class='dir-meta'><span class='dir-stat mono'>9 files</span><span class='dir-stat mono'>2026-05-30 00:14</span><span class='dir-stat mono'>0 touched</span></div><div class='progress' aria-hidden='true'><span style='width:12%' ></span></div></article>
+<article class='dir-card filterable' data-search='docs research notes, summaries, and plans 13 1 docs'><div class='dir-top'><div><h3 class='dir-name'>docs</h3><div class='dir-note'>Research notes, summaries, and plans</div></div><span class="badge badge-accent">changed</span></div><div class='dir-meta'><span class='dir-stat mono'>13 files</span><span class='dir-stat mono'>2026-05-30 12:58</span><span class='dir-stat mono'>1 touched</span></div><div class='progress' aria-hidden='true'><span style='width:14%' ></span></div></article>
+<article class='dir-card filterable' data-search='eval_metrics metric implementations and evaluation logic 7 0 eval_metrics'><div class='dir-top'><div><h3 class='dir-name'>eval_metrics</h3><div class='dir-note'>Metric implementations and evaluation logic</div></div><span class="badge badge-ok">stable</span></div><div class='dir-meta'><span class='dir-stat mono'>7 files</span><span class='dir-stat mono'>2026-05-30 00:07</span><span class='dir-stat mono'>0 touched</span></div><div class='progress' aria-hidden='true'><span style='width:10%' ></span></div></article>
+<article class='dir-card filterable' data-search='experiments run artifacts, traces, and outputs 1393 0 experiments'><div class='dir-top'><div><h3 class='dir-name'>experiments</h3><div class='dir-note'>Run artifacts, traces, and outputs</div></div><span class="badge badge-quiet">large</span></div><div class='dir-meta'><span class='dir-stat mono'>1.4K files</span><span class='dir-stat mono'>2026-05-30 12:57</span><span class='dir-stat mono'>0 touched</span></div><div class='progress' aria-hidden='true'><span style='width:100%' ></span></div></article>
+<article class='dir-card filterable' data-search='results curated outputs and aggregation tables 42 0 results'><div class='dir-top'><div><h3 class='dir-name'>results</h3><div class='dir-note'>Curated outputs and aggregation tables</div></div><span class="badge badge-ok">stable</span></div><div class='dir-meta'><span class='dir-stat mono'>42 files</span><span class='dir-stat mono'>2026-05-30 09:10</span><span class='dir-stat mono'>0 touched</span></div><div class='progress' aria-hidden='true'><span style='width:25%' ></span></div></article>
+<article class='dir-card filterable' data-search='runtime training engine, benchmark runner, server 3 1 runtime'><div class='dir-top'><div><h3 class='dir-name'>runtime</h3><div class='dir-note'>Training engine, benchmark runner, server</div></div><span class="badge badge-accent">changed</span></div><div class='dir-meta'><span class='dir-stat mono'>3 files</span><span class='dir-stat mono'>2026-05-30 11:37</span><span class='dir-stat mono'>1 touched</span></div><div class='progress' aria-hidden='true'><span style='width:8%' ></span></div></article>
+<article class='dir-card filterable' data-search='scripts cli entry points and helpers 4 2 scripts'><div class='dir-top'><div><h3 class='dir-name'>scripts</h3><div class='dir-note'>CLI entry points and helpers</div></div><span class="badge badge-accent">changed</span></div><div class='dir-meta'><span class='dir-stat mono'>4 files</span><span class='dir-stat mono'>2026-05-30 12:58</span><span class='dir-stat mono'>2 touched</span></div><div class='progress' aria-hidden='true'><span style='width:8%' ></span></div></article>
+<article class='dir-card filterable' data-search='segment_selection evidence selection and scoring 5 1 segment_selection'><div class='dir-top'><div><h3 class='dir-name'>segment_selection</h3><div class='dir-note'>Evidence selection and scoring</div></div><span class="badge badge-accent">changed</span></div><div class='dir-meta'><span class='dir-stat mono'>5 files</span><span class='dir-stat mono'>2026-05-30 11:23</span><span class='dir-stat mono'>1 touched</span></div><div class='progress' aria-hidden='true'><span style='width:8%' ></span></div></article>
+<article class='dir-card filterable' data-search='selector performance selector / ablation tools 1 0 selector'><div class='dir-top'><div><h3 class='dir-name'>selector</h3><div class='dir-note'>Performance selector / ablation tools</div></div><span class="badge badge-ok">stable</span></div><div class='dir-meta'><span class='dir-stat mono'>1 files</span><span class='dir-stat mono'>2026-05-28 22:06</span><span class='dir-stat mono'>0 touched</span></div><div class='progress' aria-hidden='true'><span style='width:8%' ></span></div></article>
+<article class='dir-card filterable' data-search='tests regression and behavior tests 7 2 tests'><div class='dir-top'><div><h3 class='dir-name'>tests</h3><div class='dir-note'>Regression and behavior tests</div></div><span class="badge badge-accent">changed</span></div><div class='dir-meta'><span class='dir-stat mono'>7 files</span><span class='dir-stat mono'>2026-05-30 11:26</span><span class='dir-stat mono'>2 touched</span></div><div class='progress' aria-hidden='true'><span style='width:10%' ></span></div></article>
+</div>
+</section>
+<section class='panel section'>
+<div class='section-head'><h2>Recent updates</h2><span class='section-sub'>Markdown notes, repo docs, and current code churn.</span></div>
+<div class='updates-grid'>
+<div class='stack'>
+<article class='doc-card filterable' data-search='argos wrap-up — 2026-05-30 2026-05-30-argos-wrapup.md /mnt/c/users/hyun/documents/papers/argos/docs/2026-05-30-argos-wrapup.md 이번 슬라이스에서 바뀐 핵심은 세 축이다. `point_f1_fixed`를 주력 비교 지표로 고정하고, oracle 성격의 값은 `point_f1_oracle`로 분리했다.'><div class='doc-head'><div><h3 class='doc-title'>ARGOS Wrap-up — 2026-05-30</h3><div class='doc-path mono'>docs/2026-05-30-argos-wrapup.md</div></div><span class="badge badge-quiet">2026-05-30 09:46</span></div><div class='doc-summary'>이번 슬라이스에서 바뀐 핵심은 세 축이다. `point_f1_fixed`를 주력 비교 지표로 고정하고, oracle 성격의 값은 `point_f1_oracle`로 분리했다.</div></article>
+<article class='doc-card filterable' data-search='a5 val-selected chunk summary — 2026-05-30 2026-05-30-val-selected-chunk-summary.md /mnt/c/users/hyun/documents/papers/argos/docs/2026-05-30-val-selected-chunk-summary.md for each eligible series, select the chunk size with the highest **mean val_f1** across repeats. test metrics are reported **once after selection**; they are not used to choose the chunk.'><div class='doc-head'><div><h3 class='doc-title'>A5 Val-Selected Chunk Summary — 2026-05-30</h3><div class='doc-path mono'>docs/2026-05-30-val-selected-chunk-summary.md</div></div><span class="badge badge-quiet">2026-05-30 09:10</span></div><div class='doc-summary'>For each eligible series, select the chunk size with the highest **mean val_f1** across repeats. Test metrics are reported **once after selection**; they are not used to choose the chunk.</div></article>
+<article class='doc-card filterable' data-search='a4 variance control report — 2026-05-30 2026-05-30-a4-variance-control-report.md /mnt/c/users/hyun/documents/papers/argos/docs/2026-05-30-a4-variance-control-report.md `run_chunk_sensitivity.py` already defaults to `temperature=0.0` and `repeats=5`. `driver.write_metadata()` now records `max_iter` and `seed` in `metadata.json`.'><div class='doc-head'><div><h3 class='doc-title'>A4 Variance Control Report — 2026-05-30</h3><div class='doc-path mono'>docs/2026-05-30-a4-variance-control-report.md</div></div><span class="badge badge-quiet">2026-05-30 09:07</span></div><div class='doc-summary'>`run_chunk_sensitivity.py` already defaults to `temperature=0.0` and `repeats=5`. `driver.write_metadata()` now records `max_iter` and `seed` in `metadata.json`.</div></article>
+<article class='doc-card filterable' data-search='evidence vs fixed — gap analysis (eligible series only) 2026-05-30-evidence-gap-analysis.md /mnt/c/users/hyun/documents/papers/argos/docs/2026-05-30-evidence-gap-analysis.md eligible series only: `88cf3a776ba00e7c`'><div class='doc-head'><div><h3 class='doc-title'>Evidence vs Fixed — Gap Analysis (Eligible Series Only)</h3><div class='doc-path mono'>docs/2026-05-30-evidence-gap-analysis.md</div></div><span class="badge badge-quiet">2026-05-30 08:37</span></div><div class='doc-summary'>Eligible series only: `88cf3a776ba00e7c`</div></article>
+<article class='doc-card filterable' data-search='argos research poc — final note (2026-05-30) 2026-05-30-argos-final-research-note.md /mnt/c/users/hyun/documents/papers/argos/docs/2026-05-30-argos-final-research-note.md we validated the corrected measurement path and then checked the kpi series for event sufficiency. the main takeaway is **not** that chunking + normal reference wins overall.'><div class='doc-head'><div><h3 class='doc-title'>ARGOS Research POC — Final Note (2026-05-30)</h3><div class='doc-path mono'>docs/2026-05-30-argos-final-research-note.md</div></div><span class="badge badge-quiet">2026-05-30 08:27</span></div><div class='doc-summary'>We validated the corrected measurement path and then checked the KPI series for event sufficiency. The main takeaway is **not** that chunking + normal reference wins overall.</div></article>
+<article class='doc-card filterable' data-search='eligible-only ablation summary 2026-05-30-eligible-only-ablation-summary.md /mnt/c/users/hyun/documents/papers/argos/docs/2026-05-30-eligible-only-ablation-summary.md eligible series: `88cf3a776ba00e7c`, `9ee5879409dccef9` rows kept: 24'><div class='doc-head'><div><h3 class='doc-title'>Eligible-only Ablation Summary</h3><div class='doc-path mono'>docs/2026-05-30-eligible-only-ablation-summary.md</div></div><span class="badge badge-quiet">2026-05-30 08:27</span></div><div class='doc-summary'>Eligible series: `88cf3a776ba00e7c`, `9ee5879409dccef9` Rows kept: 24</div></article>
+<article class='doc-card filterable' data-search='group a gate check — 2026-05-30 2026-05-30-group-a-gate-check.md /mnt/c/users/hyun/documents/papers/argos/docs/2026-05-30-group-a-gate-check.md **a1/a4/a6 bookkeeping is reflected in code and tests pass.** current summary rows show `point_f1_fixed` is present for every ablation row.'><div class='doc-head'><div><h3 class='doc-title'>Group A Gate Check — 2026-05-30</h3><div class='doc-path mono'>docs/2026-05-30-group-a-gate-check.md</div></div><span class="badge badge-quiet">2026-05-30 08:27</span></div><div class='doc-summary'>**A1/A4/A6 bookkeeping is reflected in code and tests pass.** Current summary rows show `point_f1_fixed` is present for every ablation row.</div></article>
+<article class='doc-card filterable' data-search='argos 결과 요약 및 해석 results_and_interpretation.md /mnt/c/users/hyun/documents/papers/argos/results_and_interpretation.md 이번 작업에서는 argos의 **측정 오염을 줄이고**, **증거 기반 후보 선택을 강화**하는 방향의 수정을 반영했다. `pointf1fixed`를 추가했다.'><div class='doc-head'><div><h3 class='doc-title'>ARGOS 결과 요약 및 해석</h3><div class='doc-path mono'>RESULTS_AND_INTERPRETATION.md</div></div><span class="badge badge-quiet">2026-05-29 23:04</span></div><div class='doc-summary'>이번 작업에서는 ARGOS의 **측정 오염을 줄이고**, **증거 기반 후보 선택을 강화**하는 방향의 수정을 반영했다. `PointF1Fixed`를 추가했다.</div></article>
+</div>
+<div class='stack'>
+<article class='commit-card filterable' data-search='agent/agent.py modified agent'><div class='commit-head'><div><h3 class='doc-title'>agent/agent.py</h3><div class='commit-path mono'>agent</div></div><span class="badge badge-accent"> M</span></div><div class='commit-summary'>Tracked as modified change in the current branch state.</div></article>
+<article class='commit-card filterable' data-search='agent/detection_agent.py modified agent'><div class='commit-head'><div><h3 class='doc-title'>agent/detection_agent.py</h3><div class='commit-path mono'>agent</div></div><span class="badge badge-accent"> M</span></div><div class='commit-summary'>Tracked as modified change in the current branch state.</div></article>
+<article class='commit-card filterable' data-search='agent/prompts/detection.py modified agent'><div class='commit-head'><div><h3 class='doc-title'>agent/prompts/detection.py</h3><div class='commit-path mono'>agent</div></div><span class="badge badge-accent"> M</span></div><div class='commit-summary'>Tracked as modified change in the current branch state.</div></article>
+<article class='commit-card filterable' data-search='runtime/engine.py modified runtime'><div class='commit-head'><div><h3 class='doc-title'>runtime/engine.py</h3><div class='commit-path mono'>runtime</div></div><span class="badge badge-accent"> M</span></div><div class='commit-summary'>Tracked as modified change in the current branch state.</div></article>
+<article class='commit-card filterable' data-search='scripts/run_chunk_sensitivity.py modified scripts'><div class='commit-head'><div><h3 class='doc-title'>scripts/run_chunk_sensitivity.py</h3><div class='commit-path mono'>scripts</div></div><span class="badge badge-accent"> M</span></div><div class='commit-summary'>Tracked as modified change in the current branch state.</div></article>
+<article class='commit-card filterable' data-search='segment_selection/selector.py modified segment_selection'><div class='commit-head'><div><h3 class='doc-title'>segment_selection/selector.py</h3><div class='commit-path mono'>segment_selection</div></div><span class="badge badge-accent"> M</span></div><div class='commit-summary'>Tracked as modified change in the current branch state.</div></article>
+<article class='commit-card filterable' data-search='tests/test_segment_selection.py modified tests'><div class='commit-head'><div><h3 class='doc-title'>tests/test_segment_selection.py</h3><div class='commit-path mono'>tests</div></div><span class="badge badge-accent"> M</span></div><div class='commit-summary'>Tracked as modified change in the current branch state.</div></article>
+<article class='commit-card filterable' data-search='agent/detection_query.py untracked agent'><div class='commit-head'><div><h3 class='doc-title'>agent/detection_query.py</h3><div class='commit-path mono'>agent</div></div><span class="badge badge-warn">??</span></div><div class='commit-summary'>Tracked as untracked change in the current branch state.</div></article>
+<article class='commit-card filterable' data-search='docs/repo-dashboard.html untracked docs'><div class='commit-head'><div><h3 class='doc-title'>docs/repo-dashboard.html</h3><div class='commit-path mono'>docs</div></div><span class="badge badge-warn">??</span></div><div class='commit-summary'>Tracked as untracked change in the current branch state.</div></article>
+<article class='commit-card filterable' data-search='scripts/repo_dashboard.py untracked scripts'><div class='commit-head'><div><h3 class='doc-title'>scripts/repo_dashboard.py</h3><div class='commit-path mono'>scripts</div></div><span class="badge badge-warn">??</span></div><div class='commit-summary'>Tracked as untracked change in the current branch state.</div></article>
+</div>
+</div>
+</section>
+<section class='panel section'>
+<div class='section-head'><h2>Experiment pulse</h2><span class='section-sub'>Most recent run directories and the state they are in.</span></div>
+<div class='run-grid'>
+<article class='run-card filterable' data-search='chunk_sensitivity_phase1_rerun_fixedenv 046ec29ddf80d62e 100 done final rule artifact exists. /mnt/c/users/hyun/documents/papers/argos/experiments/chunk_sensitivity_phase1_rerun_fixedenv/046ec29ddf80d62e/chunk_100/run_01 {&quot;dataset&quot;: &quot;046ec29ddf80d62e&quot;, &quot;dataset_path&quot;: &quot;results/datasets/kpi_preliminary/046ec29ddf80d62e.csv&quot;, &quot;chunk_size&quot;: 100, &quot;mode&quot;: &quot;train-llm-only&quot;, &quot;dataset_mode&quot;: &quot;one-by-one&quot;, &quot;top_k&quot;: 1, &quot;repeat_id&quot;: 1, &quot;llm_engine&quot;: &quot;gpt-4-mini&quot;, &quot;resolved_llm_engine&quot;: &quot;gpt-5.4-mini&quot;, &quot;llm_provider&quot;: &quot;chatgpt-oauth&quot;, &quot;temperature&quot;: 0.75, &quot;max_iter&quot;: null, &quot;seed&quot;: 8, &quot;segment_selection_mode&quot;: &quot;evidence&quot;, &quot;selector_config_path&quot;: &quot;/mnt/c/users/hyun/documents/papers/argos/configs/segment_selector_default.yaml&quot;, &quot;timestamp&quot;: &quot;2026-05-30t12:47:01.427574&quot;, &quot;notes&quot;: &quot;evidence mode uses label-based candidate generation as an oracle-like analysis setting.&quot;, &quot;split_stats&quot;: {&quot;train&quot;: {&quot;total_points&quot;: 4918, &quot;anomaly_point_count&quot;: 80, &quot;anomaly_event_count&quot;: 1, &quot;anomaly_point_ratio&quot;: 0.016266775111834077, &quot;anomaly_event_ratio&quot;: 0.00020333468889792598}, &quot;val&quot;: {&quot;total_points&quot;: 1230, &quot;anomaly_point_count&quot;: 0, &quot;anomaly_event_count&quot;: 0, &quot;anomaly_point_ratio&quot;: 0.0, &quot;anomaly_event_ratio&quot;: 0.0}, &quot;test&quot;: {&quot;total_points&quot;: 2636, &quot;anomaly_point_count&quot;: 0, &quot;anomaly_event_count&quot;: 0, &quot;anomaly_point_ratio&quot;: 0.0, &quot;anomaly_event_ratio&quot;: 0.0}, &quot;flags&quot;: {&quot;test_event_count_lt_5&quot;: true, &quot;test_anomaly_point_count_lt_5&quot;: true}}}'><div class='run-head'><div><h3 class='run-title'>046ec29ddf80d62e · chunk 100</h3><div class='run-path mono'>experiments/chunk_sensitivity_phase1_rerun_fixedenv/046ec29ddf80d62e/chunk_100/run_01</div></div><span class="badge badge-success">done</span></div><div class='run-summary'><div>Mode: <span class='mono'>train-LLM-only</span> · Provider: <span class='mono'>chatgpt-oauth</span></div><div>Selector: <span class='mono'>evidence</span> · Seed: <span class='mono'>8</span></div><div>Test split: <span class='mono'>0</span> anomaly points · <span class='mono'>0</span> anomaly events</div></div><div class='run-kpis'><span class="badge badge-warn">test_event_count_lt_5: true</span><span class="badge badge-warn">test_anomaly_point_count_lt_5: true</span><span class="badge badge-quiet">2026-05-30 12:57</span><span class="badge badge-quiet">Final rule artifact exists.</span></div></article>
+<article class='run-card filterable' data-search='chunk_sensitivity_phase1_rerun 046ec29ddf80d62e 100 done final rule artifact exists. /mnt/c/users/hyun/documents/papers/argos/experiments/chunk_sensitivity_phase1_rerun/046ec29ddf80d62e/chunk_100/run_01 {&quot;dataset&quot;: &quot;046ec29ddf80d62e&quot;, &quot;dataset_path&quot;: &quot;results/datasets/kpi_preliminary/046ec29ddf80d62e.csv&quot;, &quot;chunk_size&quot;: 100, &quot;mode&quot;: &quot;train-llm-only&quot;, &quot;dataset_mode&quot;: &quot;one-by-one&quot;, &quot;top_k&quot;: 1, &quot;repeat_id&quot;: 1, &quot;llm_engine&quot;: &quot;gpt-4-mini&quot;, &quot;resolved_llm_engine&quot;: &quot;gpt-5.4-mini&quot;, &quot;llm_provider&quot;: &quot;chatgpt-oauth&quot;, &quot;temperature&quot;: 0.75, &quot;max_iter&quot;: null, &quot;seed&quot;: 8, &quot;segment_selection_mode&quot;: &quot;evidence&quot;, &quot;selector_config_path&quot;: &quot;/mnt/c/users/hyun/documents/papers/argos/configs/segment_selector_default.yaml&quot;, &quot;timestamp&quot;: &quot;2026-05-30t12:35:51.537003&quot;, &quot;notes&quot;: &quot;evidence mode uses label-based candidate generation as an oracle-like analysis setting.&quot;, &quot;split_stats&quot;: {&quot;train&quot;: {&quot;total_points&quot;: 4918, &quot;anomaly_point_count&quot;: 80, &quot;anomaly_event_count&quot;: 1, &quot;anomaly_point_ratio&quot;: 0.016266775111834077, &quot;anomaly_event_ratio&quot;: 0.00020333468889792598}, &quot;val&quot;: {&quot;total_points&quot;: 1230, &quot;anomaly_point_count&quot;: 0, &quot;anomaly_event_count&quot;: 0, &quot;anomaly_point_ratio&quot;: 0.0, &quot;anomaly_event_ratio&quot;: 0.0}, &quot;test&quot;: {&quot;total_points&quot;: 2636, &quot;anomaly_point_count&quot;: 0, &quot;anomaly_event_count&quot;: 0, &quot;anomaly_point_ratio&quot;: 0.0, &quot;anomaly_event_ratio&quot;: 0.0}, &quot;flags&quot;: {&quot;test_event_count_lt_5&quot;: true, &quot;test_anomaly_point_count_lt_5&quot;: true}}}'><div class='run-head'><div><h3 class='run-title'>046ec29ddf80d62e · chunk 100</h3><div class='run-path mono'>experiments/chunk_sensitivity_phase1_rerun/046ec29ddf80d62e/chunk_100/run_01</div></div><span class="badge badge-success">done</span></div><div class='run-summary'><div>Mode: <span class='mono'>train-LLM-only</span> · Provider: <span class='mono'>chatgpt-oauth</span></div><div>Selector: <span class='mono'>evidence</span> · Seed: <span class='mono'>8</span></div><div>Test split: <span class='mono'>0</span> anomaly points · <span class='mono'>0</span> anomaly events</div></div><div class='run-kpis'><span class="badge badge-warn">test_event_count_lt_5: true</span><span class="badge badge-warn">test_anomaly_point_count_lt_5: true</span><span class="badge badge-quiet">2026-05-30 12:56</span><span class="badge badge-quiet">Final rule artifact exists.</span></div></article>
+<article class='run-card filterable' data-search='chunk_sensitivity_phase1_rerun_debug 046ec29ddf80d62e 100 done final rule artifact exists. /mnt/c/users/hyun/documents/papers/argos/experiments/chunk_sensitivity_phase1_rerun_debug/046ec29ddf80d62e/chunk_100/run_01 {&quot;dataset&quot;: &quot;046ec29ddf80d62e&quot;, &quot;dataset_path&quot;: &quot;results/datasets/kpi_preliminary/046ec29ddf80d62e.csv&quot;, &quot;chunk_size&quot;: 100, &quot;mode&quot;: &quot;train-llm-only&quot;, &quot;dataset_mode&quot;: &quot;one-by-one&quot;, &quot;top_k&quot;: 1, &quot;repeat_id&quot;: 1, &quot;llm_engine&quot;: &quot;gpt-4-mini&quot;, &quot;resolved_llm_engine&quot;: &quot;gpt-5.4-mini&quot;, &quot;llm_provider&quot;: &quot;chatgpt-oauth&quot;, &quot;temperature&quot;: 0.75, &quot;max_iter&quot;: null, &quot;seed&quot;: 8, &quot;segment_selection_mode&quot;: &quot;evidence&quot;, &quot;selector_config_path&quot;: &quot;/mnt/c/users/hyun/documents/papers/argos/configs/segment_selector_default.yaml&quot;, &quot;timestamp&quot;: &quot;2026-05-30t12:35:33.703326&quot;, &quot;notes&quot;: &quot;evidence mode uses label-based candidate generation as an oracle-like analysis setting.&quot;, &quot;split_stats&quot;: {&quot;train&quot;: {&quot;total_points&quot;: 4918, &quot;anomaly_point_count&quot;: 80, &quot;anomaly_event_count&quot;: 1, &quot;anomaly_point_ratio&quot;: 0.016266775111834077, &quot;anomaly_event_ratio&quot;: 0.00020333468889792598}, &quot;val&quot;: {&quot;total_points&quot;: 1230, &quot;anomaly_point_count&quot;: 0, &quot;anomaly_event_count&quot;: 0, &quot;anomaly_point_ratio&quot;: 0.0, &quot;anomaly_event_ratio&quot;: 0.0}, &quot;test&quot;: {&quot;total_points&quot;: 2636, &quot;anomaly_point_count&quot;: 0, &quot;anomaly_event_count&quot;: 0, &quot;anomaly_point_ratio&quot;: 0.0, &quot;anomaly_event_ratio&quot;: 0.0}, &quot;flags&quot;: {&quot;test_event_count_lt_5&quot;: true, &quot;test_anomaly_point_count_lt_5&quot;: true}}}'><div class='run-head'><div><h3 class='run-title'>046ec29ddf80d62e · chunk 100</h3><div class='run-path mono'>experiments/chunk_sensitivity_phase1_rerun_debug/046ec29ddf80d62e/chunk_100/run_01</div></div><span class="badge badge-success">done</span></div><div class='run-summary'><div>Mode: <span class='mono'>train-LLM-only</span> · Provider: <span class='mono'>chatgpt-oauth</span></div><div>Selector: <span class='mono'>evidence</span> · Seed: <span class='mono'>8</span></div><div>Test split: <span class='mono'>0</span> anomaly points · <span class='mono'>0</span> anomaly events</div></div><div class='run-kpis'><span class="badge badge-warn">test_event_count_lt_5: true</span><span class="badge badge-warn">test_anomaly_point_count_lt_5: true</span><span class="badge badge-quiet">2026-05-30 12:44</span><span class="badge badge-quiet">Final rule artifact exists.</span></div></article>
+<article class='run-card filterable' data-search='experiments 046ec29ddf80d62e 5000 done final rule artifact exists. /mnt/c/users/hyun/documents/papers/argos/experiments/chunk_sensitivity_gpt4mini_oauth/chunk_5000/run_01 {&quot;dataset&quot;: &quot;046ec29ddf80d62e&quot;, &quot;dataset_path&quot;: &quot;results\\datasets\\kpi_preliminary\\046ec29ddf80d62e.csv&quot;, &quot;chunk_size&quot;: 5000, &quot;mode&quot;: &quot;train-llm-only&quot;, &quot;dataset_mode&quot;: &quot;one-by-one&quot;, &quot;top_k&quot;: 1, &quot;repeat_id&quot;: 1, &quot;llm_engine&quot;: &quot;gpt-4-mini&quot;, &quot;resolved_llm_engine&quot;: &quot;gpt-5.4-mini&quot;, &quot;llm_provider&quot;: &quot;chatgpt-oauth&quot;, &quot;temperature&quot;: 0.75, &quot;segment_selection_mode&quot;: &quot;evidence&quot;, &quot;selector_config_path&quot;: &quot;c:\\users\\hyun\\documents\\papers\\argos\\configs\\segment_selector_default.yaml&quot;, &quot;timestamp&quot;: &quot;2026-05-28t23:05:13.718335&quot;, &quot;notes&quot;: &quot;evidence mode uses label-based candidate generation as an oracle-like analysis setting.&quot;}'><div class='run-head'><div><h3 class='run-title'>046ec29ddf80d62e · chunk 5000</h3><div class='run-path mono'>experiments/chunk_sensitivity_gpt4mini_oauth/chunk_5000/run_01</div></div><span class="badge badge-success">done</span></div><div class='run-summary'><div>Mode: <span class='mono'>train-LLM-only</span> · Provider: <span class='mono'>chatgpt-oauth</span></div><div>Selector: <span class='mono'>evidence</span> · Seed: <span class='mono'>—</span></div><div>Test split: <span class='mono'>—</span> anomaly points · <span class='mono'>—</span> anomaly events</div></div><div class='run-kpis'><span class="badge badge-quiet">no flags</span><span class="badge badge-quiet">2026-05-29 23:39</span><span class="badge badge-quiet">Final rule artifact exists.</span></div></article>
+<article class='run-card filterable' data-search='experiments 046ec29ddf80d62e 500 done final rule artifact exists. /mnt/c/users/hyun/documents/papers/argos/experiments/chunk_sensitivity_gpt4mini_oauth/chunk_500/run_01 {&quot;dataset&quot;: &quot;046ec29ddf80d62e&quot;, &quot;dataset_path&quot;: &quot;results\\datasets\\kpi_preliminary\\046ec29ddf80d62e.csv&quot;, &quot;chunk_size&quot;: 500, &quot;mode&quot;: &quot;train-llm-only&quot;, &quot;dataset_mode&quot;: &quot;one-by-one&quot;, &quot;top_k&quot;: 1, &quot;repeat_id&quot;: 1, &quot;llm_engine&quot;: &quot;gpt-4-mini&quot;, &quot;resolved_llm_engine&quot;: &quot;gpt-5.4-mini&quot;, &quot;llm_provider&quot;: &quot;chatgpt-oauth&quot;, &quot;temperature&quot;: 0.75, &quot;segment_selection_mode&quot;: &quot;evidence&quot;, &quot;selector_config_path&quot;: &quot;c:\\users\\hyun\\documents\\papers\\argos\\configs\\segment_selector_default.yaml&quot;, &quot;timestamp&quot;: &quot;2026-05-28t22:59:26.359255&quot;, &quot;notes&quot;: &quot;evidence mode uses label-based candidate generation as an oracle-like analysis setting.&quot;}'><div class='run-head'><div><h3 class='run-title'>046ec29ddf80d62e · chunk 500</h3><div class='run-path mono'>experiments/chunk_sensitivity_gpt4mini_oauth/chunk_500/run_01</div></div><span class="badge badge-success">done</span></div><div class='run-summary'><div>Mode: <span class='mono'>train-LLM-only</span> · Provider: <span class='mono'>chatgpt-oauth</span></div><div>Selector: <span class='mono'>evidence</span> · Seed: <span class='mono'>—</span></div><div>Test split: <span class='mono'>—</span> anomaly points · <span class='mono'>—</span> anomaly events</div></div><div class='run-kpis'><span class="badge badge-quiet">no flags</span><span class="badge badge-quiet">2026-05-29 23:39</span><span class="badge badge-quiet">Final rule artifact exists.</span></div></article>
+<article class='run-card filterable' data-search='experiments 046ec29ddf80d62e 2500 done final rule artifact exists. /mnt/c/users/hyun/documents/papers/argos/experiments/chunk_sensitivity_gpt4mini_oauth/chunk_2500/run_01 {&quot;dataset&quot;: &quot;046ec29ddf80d62e&quot;, &quot;dataset_path&quot;: &quot;results\\datasets\\kpi_preliminary\\046ec29ddf80d62e.csv&quot;, &quot;chunk_size&quot;: 2500, &quot;mode&quot;: &quot;train-llm-only&quot;, &quot;dataset_mode&quot;: &quot;one-by-one&quot;, &quot;top_k&quot;: 1, &quot;repeat_id&quot;: 1, &quot;llm_engine&quot;: &quot;gpt-4-mini&quot;, &quot;resolved_llm_engine&quot;: &quot;gpt-5.4-mini&quot;, &quot;llm_provider&quot;: &quot;chatgpt-oauth&quot;, &quot;temperature&quot;: 0.75, &quot;segment_selection_mode&quot;: &quot;evidence&quot;, &quot;selector_config_path&quot;: &quot;c:\\users\\hyun\\documents\\papers\\argos\\configs\\segment_selector_default.yaml&quot;, &quot;timestamp&quot;: &quot;2026-05-28t23:03:19.935091&quot;, &quot;notes&quot;: &quot;evidence mode uses label-based candidate generation as an oracle-like analysis setting.&quot;}'><div class='run-head'><div><h3 class='run-title'>046ec29ddf80d62e · chunk 2500</h3><div class='run-path mono'>experiments/chunk_sensitivity_gpt4mini_oauth/chunk_2500/run_01</div></div><span class="badge badge-success">done</span></div><div class='run-summary'><div>Mode: <span class='mono'>train-LLM-only</span> · Provider: <span class='mono'>chatgpt-oauth</span></div><div>Selector: <span class='mono'>evidence</span> · Seed: <span class='mono'>—</span></div><div>Test split: <span class='mono'>—</span> anomaly points · <span class='mono'>—</span> anomaly events</div></div><div class='run-kpis'><span class="badge badge-quiet">no flags</span><span class="badge badge-quiet">2026-05-29 23:39</span><span class="badge badge-quiet">Final rule artifact exists.</span></div></article>
+</div>
+</section>
+<section class='panel section'>
+<div class='section-head'><h2>Recent commits</h2><span class='section-sub'>Latest history from git log.</span></div>
+<div class='stack'>
+<article class='commit-card'><div class='commit-head'><div><h3 class='doc-title mono'>47d72ad</h3><div class='commit-path mono'>2026-05-30</div></div><span class="badge badge-quiet">commit</span></div><div class='commit-summary'>feat: add chunk sensitivity analysis updates</div></article>
+<article class='commit-card'><div class='commit-head'><div><h3 class='doc-title mono'>74e64b2</h3><div class='commit-path mono'>2026-05-29</div></div><span class="badge badge-quiet">commit</span></div><div class='commit-summary'>feat: push remaining paper changes</div></article>
+<article class='commit-card'><div class='commit-head'><div><h3 class='doc-title mono'>f4bf425</h3><div class='commit-path mono'>2026-05-29</div></div><span class="badge badge-quiet">commit</span></div><div class='commit-summary'>docs: add ARGOS results interpretation summary</div></article>
+<article class='commit-card'><div class='commit-head'><div><h3 class='doc-title mono'>22f18c5</h3><div class='commit-path mono'>2026-05-29</div></div><span class="badge badge-quiet">commit</span></div><div class='commit-summary'>Add ARGOS pilot experiment summaries</div></article>
+<article class='commit-card'><div class='commit-head'><div><h3 class='doc-title mono'>9697bd6</h3><div class='commit-path mono'>2026-05-28</div></div><span class="badge badge-quiet">commit</span></div><div class='commit-summary'>Add evidence-aware segment selection experiments</div></article>
+</div>
+</section>
+<div class='footer'><div>Generated from <span class='mono'>/mnt/c/Users/hyun/Documents/papers/argos</span></div><div>Refresh time: <span class='mono'>2026-05-30 12:58</span></div></div>
+</div>
+<script>
+const input = document.getElementById('filter');
+const cards = [...document.querySelectorAll('.filterable')];
+input.addEventListener('input', () => {
+  const q = input.value.trim().toLowerCase();
+  cards.forEach(card => {
+    const hay = card.dataset.search || '';
+    card.style.display = !q || hay.includes(q) ? '' : 'none';
+  });
+});
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    input.focus();
+  }
+  if (e.key === '/' && document.activeElement !== input) {
+    e.preventDefault();
+    input.focus();
+  }
+});
+</script>
+</body></html>

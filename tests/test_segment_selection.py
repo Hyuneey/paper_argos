@@ -97,29 +97,36 @@ class SegmentSelectionTests(unittest.TestCase):
             self.assertEqual(first.selected_score.total, second.selected_score.total)
 
     def test_selector_applies_normal_context_floor_against_full_density_candidates(self):
-        df = pd.DataFrame(
+        full_df = pd.DataFrame(
             {
-                "value": [0.0, 0.0, 0.0, 0.0, 5.0, 5.0, 5.0, 5.0],
-                "label": [0, 0, 0, 0, 1, 1, 1, 1],
-                "index": list(range(8)),
+                "value": [5.0, 5.0, 5.0, 5.0],
+                "label": [1, 1, 1, 1],
+                "index": list(range(4)),
+            }
+        )
+        mixed_df = pd.DataFrame(
+            {
+                "value": [0.0, 0.0, 5.0, 5.0, 0.0, 0.0],
+                "label": [0, 0, 1, 1, 0, 0],
+                "index": list(range(6)),
             }
         )
         candidates = [
             CandidateSegment(
                 kind="full_density",
-                df=df.iloc[4:8].copy(),
-                start_pos=4,
-                end_pos=8,
+                df=full_df.copy(),
+                start_pos=0,
+                end_pos=4,
                 rationale=("anomaly-only window",),
                 reference_segment=None,
             ),
             CandidateSegment(
                 kind="reference_anchored",
-                df=df.iloc[4:8].copy(),
-                start_pos=4,
-                end_pos=8,
-                rationale=("same window with matched reference",),
-                reference_segment=(0, 4),
+                df=mixed_df.copy(),
+                start_pos=0,
+                end_pos=6,
+                rationale=("mixed window with matched reference",),
+                reference_segment=(0, 2),
             ),
         ]
 
@@ -142,7 +149,7 @@ class SegmentSelectionTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = SegmentSelector(str(config_path)).select(candidates, df, 4)
+            result = SegmentSelector(str(config_path)).select(candidates, full_df, 4)
 
         self.assertEqual(result.selected.kind, "reference_anchored")
 

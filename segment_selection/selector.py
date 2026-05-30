@@ -39,8 +39,14 @@ class SegmentSelector:
             (candidate, self.scorer.score(candidate, full_df, target_chunk_size))
             for candidate in candidates
         ]
+        eligible = [
+            (candidate, score)
+            for candidate, score in scored
+            if self._is_eligible(candidate, score)
+        ]
+        pool = eligible or scored
         selected, selected_score = max(
-            scored,
+            pool,
             key=lambda item: (
                 item[1].total,
                 item[1].components.get("normal_contrast", 0.0),
@@ -55,3 +61,12 @@ class SegmentSelector:
             candidate_scores=scored,
             config_hash=self.config_hash,
         )
+
+    @staticmethod
+    def _is_eligible(candidate: CandidateSegment, score: UtilityScore) -> bool:
+        components = score.components
+        if components.get("anomaly_density", 0.0) >= 1.0:
+            return False
+        if components.get("normal_context_floor", 0.0) > 0.0:
+            return False
+        return True

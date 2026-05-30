@@ -189,6 +189,84 @@ class AggregateChunkSensitivityTests(unittest.TestCase):
         self.assertEqual(grouped_row["point_f1_fixed_ci_low"], 0.25)
         self.assertEqual(grouped_row["point_f1_fixed_ci_high"], 0.25)
 
+    def test_aggregate_run_uses_val_to_choose_rule_when_best_rule_path_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = Path(tmpdir)
+
+            rule0 = run_dir / "rule_iter0_0.py"
+            rule1 = run_dir / "rule_iter1_0.py"
+            rule0.write_text("# rule 0\n", encoding="utf-8")
+            rule1.write_text("# rule 1\n", encoding="utf-8")
+
+            payloads = {
+                rule0: {
+                    "train": {"f1": 0.10},
+                    "val": {"f1": 0.20},
+                    "test": {
+                        "f1": 0.90,
+                        "point-wise f1": {"f1": 0.11},
+                        "point-wise fixed f1": {"f1": 0.12},
+                        "best f1 under pa": {"f1": 0.13},
+                        "event-based f1 under pa with mode squeeze": {
+                            "f1": 0.14,
+                            "precision": 0.15,
+                            "recall": 0.16,
+                        },
+                    },
+                },
+                rule1: {
+                    "train": {"f1": 0.30},
+                    "val": {"f1": 0.80},
+                    "test": {
+                        "f1": 0.40,
+                        "point-wise f1": {"f1": 0.31},
+                        "point-wise fixed f1": {"f1": 0.32},
+                        "best f1 under pa": {"f1": 0.33},
+                        "event-based f1 under pa with mode squeeze": {
+                            "f1": 0.34,
+                            "precision": 0.35,
+                            "recall": 0.36,
+                        },
+                        "affiliation f1": {"f1": 0.37},
+                    },
+                },
+            }
+            for rule_path, splits in payloads.items():
+                for split, payload in splits.items():
+                    (run_dir / f"{rule_path.stem}_eval_res_{split}.json").write_text(
+                        json.dumps(payload), encoding="utf-8"
+                    )
+
+            (run_dir / "metadata.json").write_text(
+                json.dumps(
+                    {
+                        "dataset": "toy",
+                        "chunk_size": 100,
+                        "repeat_id": 1,
+                        "segment_selection_mode": "fixed",
+                        "llm_provider": "openai",
+                        "llm_engine": "gpt-4o-mini",
+                        "temperature": 0.0,
+                        "top_k": 1,
+                        "max_iter": 1,
+                        "seed": 8,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "stats.json").write_text(json.dumps({"time_elapsed": 1.0}), encoding="utf-8")
+
+            row = aggregate_run(run_dir)
+
+            self.assertIsNotNone(row)
+            self.assertEqual(row["val_f1"], 0.8)
+            self.assertEqual(row["test_f1"], 0.4)
+            self.assertEqual(row["point_f1"], 0.32)
+            self.assertEqual(row["point_f1_fixed"], 0.32)
+            self.assertEqual(row["point_f1_oracle"], 0.31)
+            self.assertEqual(row["point_f1pa"], 0.33)
+            self.assertEqual(row["affiliation_f1"], 0.37)
+
 
 if __name__ == "__main__":
     unittest.main()
