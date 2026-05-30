@@ -1,4 +1,4 @@
-# ARGOS Comparison Suite Result Report — 2026-05-30
+# 02. ARGOS Comparison Suite Result Report — 2026-05-30
 
 ## 0. Current status
 - 체크리스트 항목 `T1.5 ~ T2.6`은 코드/테스트 기준으로 완료 상태입니다.

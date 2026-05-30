@@ -1,4 +1,4 @@
-# A4 Variance Control Report — 2026-05-30
+# 01. A4 Variance Control Report — 2026-05-30
 
 ## Status
 - `run_chunk_sensitivity.py` already defaults to `temperature=0.0` and `repeats=5`.
