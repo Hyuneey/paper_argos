@@ -54,9 +54,10 @@ class LLM:
         self.engine = self.name
         self.system_prompt = system_prompt
         self.past_message_num = max(0, past_message_num)
+        temperature = float(os.environ.get("ARGOS_LLM_TEMPERATURE", str(temperature)))
         # list of tuple of (input_token_count, output_token_count)
         self.input_output_token_count = []
-        self._token_count_lock = threading.Lock()
+
 
         self._thread_local = threading.local()
         

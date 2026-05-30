@@ -1,0 +1,16 @@
+{
+  "dataset": "02e99bd4f6cfb33f",
+  "dataset_path": "results\\datasets\\kpi_preliminary\\02e99bd4f6cfb33f.csv",
+  "chunk_size": 100,
+  "mode": "train-LLM-only",
+  "dataset_mode": "one-by-one",
+  "top_k": 1,
+  "repeat_id": 1,
+  "llm_engine": "gpt-4o",
+  "llm_provider": "chatgpt-oauth",
+  "temperature": 0.75,
+  "segment_selection_mode": "evidence",
+  "selector_config_path": "configs\\segment_selector_default.yaml",
+  "timestamp": "2026-05-28T22:33:25.783297",
+  "notes": "Evidence mode uses label-based candidate generation as an oracle-like analysis setting."
+}

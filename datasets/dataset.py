@@ -47,6 +47,7 @@ class ArgosDataset(ABC):
         self.selection_random_seed = selection_random_seed
         self.selection_call_count = 0
         self.selection_trace_paths = []
+        self.last_selection_reference_df = None
         self.skip_training = False
         if self.segment_selection_mode not in {"fixed", "evidence"}:
             raise ValueError(
@@ -468,6 +469,7 @@ class ArgosDataset(ABC):
         selection = self.segment_selector.select(
             candidates, self.train_df, self.chunk_size
         )
+        self.last_selection_reference_df = self._selection_reference_df(selection)
         trace_path = write_selection_trace(
             selection,
             self.selection_trace_dir,
@@ -480,6 +482,16 @@ class ArgosDataset(ABC):
         if trace_path:
             self.selection_trace_paths.append(trace_path)
         return selection.selected.df
+
+    def _selection_reference_df(self, selection):
+        reference_segment = selection.selected.reference_segment
+        if reference_segment is None:
+            return None
+        start_pos, end_pos = reference_segment
+        reference_df = self.train_df.iloc[start_pos:end_pos].copy()
+        if reference_df.empty:
+            return None
+        return reference_df
 
     def get_test_df_by_iter(self, iter_num):
         chunk_id = iter_num % len(self.test_dict)
@@ -588,6 +600,71 @@ class ArgosDataset(ABC):
     def get_val_dict(self):
         return self.val_dict
 
+    def get_split_anomaly_stats(self):
+        """Return anomaly point/event counts for train/val/test splits.
+
+        The returned structure is nested so callers can persist it directly in
+        metadata/stats JSON and flatten it only at aggregation time.
+        """
+
+        if self.dataset_mode == "one-by-one":
+            train_stats = self._split_anomaly_stats(self.train_df)
+            val_stats = self._split_anomaly_stats(self.val_df)
+            test_stats = self._split_anomaly_stats(self.test_df)
+            return {
+                "train": train_stats,
+                "val": val_stats,
+                "test": test_stats,
+                "flags": {
+                    "test_event_count_lt_5": test_stats["anomaly_event_count"] < 5,
+                    "test_anomaly_point_count_lt_5": test_stats["anomaly_point_count"] < 5,
+                },
+            }
+
+        if self.dataset_mode == "all-in-one":
+            stats = {}
+            for dataset_name, (train_df, test_df, val_df) in self.dataset_dict.items():
+                train_stats = self._split_anomaly_stats(train_df)
+                val_stats = self._split_anomaly_stats(val_df)
+                test_stats = self._split_anomaly_stats(test_df)
+                stats[dataset_name] = {
+                    "train": train_stats,
+                    "val": val_stats,
+                    "test": test_stats,
+                    "flags": {
+                        "test_event_count_lt_5": test_stats["anomaly_event_count"] < 5,
+                        "test_anomaly_point_count_lt_5": test_stats["anomaly_point_count"] < 5,
+                    },
+                }
+            return stats
+
+        raise NotImplementedError("Split stats only support one-by-one/all-in-one datasets")
+
+    def _split_anomaly_stats(self, df):
+        labels = df["label"].to_numpy()
+        total_points = int(len(df))
+        anomaly_point_count = int(labels.sum())
+        anomaly_event_count = self._count_anomaly_events(labels)
+        return {
+            "total_points": total_points,
+            "anomaly_point_count": anomaly_point_count,
+            "anomaly_event_count": anomaly_event_count,
+            "anomaly_point_ratio": anomaly_point_count / total_points if total_points else 0.0,
+            "anomaly_event_ratio": anomaly_event_count / total_points if total_points else 0.0,
+        }
+
+    @staticmethod
+    def _count_anomaly_events(labels):
+        count = 0
+        in_event = False
+        for label in labels:
+            if label and not in_event:
+                in_event = True
+                count += 1
+            elif not label and in_event:
+                in_event = False
+        return count
+
     def get_train_dict(self):
         return self.train_dict
 
@@ -606,6 +683,11 @@ class ArgosDataset(ABC):
 
     def get_selection_trace_paths(self):
         return list(self.selection_trace_paths)
+
+    def get_last_selection_reference_df(self):
+        if self.segment_selection_mode != "evidence":
+            return None
+        return self.last_selection_reference_df
 
     def get_segment_selection_mode(self):
         return self.segment_selection_mode

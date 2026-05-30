@@ -1,0 +1,1 @@
+{"cur_iter": 0, "max_iter": 0, "max_time": 9000, "time_elapsed": 0.0, "best_rule_paths": [null], "mode": "train-LLM-only", "segment_selection_mode": "evidence", "segment_selector_config": "configs\\segment_selector_default.yaml", "selection_trace_paths": [], "token_count": {"DetectionAgentV3": [[], 0, 0], "RepairAgent": [[], 0, 0], "ReviewAgent": [[], 0, 0]}}

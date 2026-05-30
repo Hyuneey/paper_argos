@@ -17,6 +17,7 @@ DEFAULT_WEIGHTS = {
     "anomaly_coverage": 0.15,
     "normal_contrast": 0.25,
     "reference_context": 0.15,
+    "normal_context_floor": 0.10,
     "length_penalty": 0.08,
     "token_cost": 0.02,
 }
@@ -67,6 +68,8 @@ class UtilityScorer:
         change_magnitude = _change_magnitude(segment, full_df)
         normal_contrast = _normal_contrast(segment, full_df, candidate.reference_segment)
         reference_context = 1.0 if candidate.reference_segment is not None else 0.0
+        normal_context = max(normal_contrast, reference_context)
+        normal_context_floor = max(0.0, float(self.weights.get("normal_context_floor", 0.0)) - normal_context)
         length_penalty = min(1.0, _safe_div(len(segment), max(1, target_chunk_size)))
         token_cost = length_penalty
 
@@ -76,13 +79,14 @@ class UtilityScorer:
             "anomaly_coverage": anomaly_coverage,
             "normal_contrast": normal_contrast,
             "reference_context": reference_context,
+            "normal_context_floor": normal_context_floor,
             "length_penalty": length_penalty,
             "token_cost": token_cost,
         }
         total = 0.0
         for key, value in components.items():
             weight = float(self.weights.get(key, 0.0))
-            if key in {"length_penalty", "token_cost"}:
+            if key in {"length_penalty", "token_cost", "normal_context_floor"}:
                 total -= weight * value
             else:
                 total += weight * value

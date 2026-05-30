@@ -5,8 +5,9 @@ import pickle
 import pprint
 import sys
 import time
+import random
 from abc import ABC, abstractmethod
-from datetime import datetime
+
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -49,7 +50,9 @@ class Engine(ABC):
         max_iter=None,
         segment_selection_mode="fixed",
         segment_selector_config=None,
+        seed=8,
     ):
+
         self.chunk_size = chunk_size
         self.image_chunk_size = image_chunk_size
         self.image_subplots = image_subplots
@@ -65,11 +68,13 @@ class Engine(ABC):
         self.rule_per_group = rule_per_group
         self.segment_selection_mode = segment_selection_mode
         self.segment_selector_config = segment_selector_config
+        self.seed = seed
         # for threading
         self.lock = threading.Lock()
 
         # set random seed
-        np.random.seed(8)
+        random.seed(seed)
+        np.random.seed(seed)
 
         if mode == "train-combined-fp" or mode == "train-combined-fn":
             assert (
@@ -103,8 +108,9 @@ class Engine(ABC):
             segment_selection_mode=segment_selection_mode,
             segment_selector_config=segment_selector_config,
             selection_trace_dir=rule_path,
+            selection_random_seed=seed,
         )
-        # save logs to file
+
         logging.basicConfig(
             filename=os.path.join(self.rule_path, "output.log"),
             level=logging.INFO,
@@ -438,16 +444,18 @@ class Engine(ABC):
 
         self.wrapup_run(start_time, None)
 
-    def run_normal_mode_thread(self, 
+    def run_normal_mode_thread(
                                id,
                                start_time,
                                curr_dfs,
                                last_rule_path,
-                               rule_perf_pairs):
+                               rule_perf_pairs,
+                               reference_dfs=None):
         self.detection_agent.run(
             curr_dfs=curr_dfs,
             curr_rule_path=self.get_rule_path(top_k_curr=id),
             last_rule_path=last_rule_path,
+            reference_dfs=reference_dfs,
             image_path=None
         )
 
@@ -606,11 +614,16 @@ class Engine(ABC):
 
             # pick a random int
             curr_dfs = []
+            reference_dfs = []
 
             for i in range(self.sample_per_prompt):
                 rand_num = np.random.randint(0, 1000)
                 curr_df = self.dataset.get_train_df_by_iter(rand_num)
                 curr_dfs.append(curr_df)
+                if self.segment_selection_mode == "evidence":
+                    reference_dfs.append(self.dataset.get_last_selection_reference_df())
+                else:
+                    reference_dfs.append(None)
 
             rule_perf_pairs = []
             threads = []
@@ -669,6 +682,7 @@ class Engine(ABC):
                         curr_rule_path=self.get_rule_path(top_k_curr=top_k_curr),
                         last_rule_path=last_rule_paths[top_k_curr],
                         anomaly_types=final_anomaly_types,
+                        reference_dfs=[reference_dfs[0]] if self.segment_selection_mode == "evidence" else None,
                     )
                 elif self.mode == "train-LLM-only-parallel":
                     thread = threading.Thread(
@@ -679,6 +693,7 @@ class Engine(ABC):
                         curr_dfs,
                         last_rule_paths[top_k_curr],
                         rule_perf_pairs,
+                        reference_dfs if self.segment_selection_mode == "evidence" else None,
                     ),
                     )
                     threads.append(thread)
@@ -692,6 +707,7 @@ class Engine(ABC):
                         curr_dfs=curr_dfs,
                         curr_rule_path=self.get_rule_path(top_k_curr=top_k_curr),
                         last_rule_path=last_rule_paths[top_k_curr],
+                        reference_dfs=reference_dfs if self.segment_selection_mode == "evidence" else None,
                         image_path=None,
                     )
                 print("Detection done HOHOHOHOHO")
@@ -894,6 +910,7 @@ class Engine(ABC):
             "segment_selection_mode": self.segment_selection_mode,
             "segment_selector_config": self.segment_selector_config,
             "selection_trace_paths": self.dataset.get_selection_trace_paths(),
+            "split_stats": self.dataset.get_split_anomaly_stats(),
             "token_count": {},
         }
         for agent in [self.detection_agent, self.repair_agent, self.review_agent]:
@@ -992,16 +1009,22 @@ class Engine(ABC):
 
             # pick a random int
             curr_dfs = []
+            reference_dfs = []
 
             for i in range(self.sample_per_prompt):
                 rand_num = np.random.randint(0, 1000)
                 curr_df = self.dataset.get_train_df_by_iter(rand_num)
                 curr_dfs.append(curr_df)
+                if self.segment_selection_mode == "evidence":
+                    reference_dfs.append(self.dataset.get_last_selection_reference_df())
+                else:
+                    reference_dfs.append(None)
 
             self.detection_agent.run(
                 curr_dfs=curr_dfs,
                 curr_rule_path=self.get_rule_path(),
                 last_rule_path=last_rule_path,
+                reference_dfs=reference_dfs if self.segment_selection_mode == "evidence" else None,
                 image_path=None,
             )
 
@@ -1216,6 +1239,9 @@ class Engine(ABC):
 
     def get_test_df(self):
         return self.dataset.get_test_df()
+
+    def get_split_anomaly_stats(self):
+        return self.dataset.get_split_anomaly_stats()
 
     def get_rule_path(self, top_k_curr=1):
         rule_path = self.rule_file_base + f"_iter{self.cur_iter}_{top_k_curr}.py"

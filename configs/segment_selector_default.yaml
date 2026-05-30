@@ -4,5 +4,6 @@ weights:
   anomaly_coverage: 0.15
   normal_contrast: 0.25
   reference_context: 0.15
+  normal_context_floor: 0.10
   length_penalty: 0.08
   token_cost: 0.02

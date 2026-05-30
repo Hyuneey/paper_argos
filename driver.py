@@ -5,6 +5,7 @@ import argparse
 import json
 import logging
 import os
+import random
 from datetime import datetime
 
 import numpy as np
@@ -49,6 +50,7 @@ def main(args):
     p_cores = args.p_cores
     rule_per_group = args.rule_per_group
     max_iter = args.max_iter
+    seed = args.seed
     segment_selection_mode = args.segment_selection_mode
     segment_selector_config = args.segment_selector_config
 
@@ -59,6 +61,10 @@ def main(args):
 
     if llm_provider:
         os.environ["ARGOS_LLM_PROVIDER"] = llm_provider
+    os.environ["ARGOS_LLM_TEMPERATURE"] = str(args.temperature)
+    os.environ["ARGOS_RANDOM_SEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
 
     for i in tqdm.tqdm(range(repeat), dynamic_ncols=True):
         postfix = os.path.splitext(os.path.basename(dataset_path))[0]
@@ -85,6 +91,7 @@ def main(args):
                 rule_per_group=rule_per_group,
                 segment_selection_mode=segment_selection_mode,
                 segment_selector_config=segment_selector_config,
+                seed=seed,
             )
         elif mode == "eval-combined":
             engine = Engine(
@@ -100,6 +107,7 @@ def main(args):
                 rule_per_group=rule_per_group,
                 segment_selection_mode=segment_selection_mode,
                 segment_selector_config=segment_selector_config,
+                seed=seed,
             )
         else:
             engine = Engine(
@@ -121,9 +129,10 @@ def main(args):
                 max_iter=max_iter,
                 segment_selection_mode=segment_selection_mode,
                 segment_selector_config=segment_selector_config,
+                seed=seed,
             )
 
-        write_metadata(args, final_result_path, repeat_id=i + 1)
+        write_metadata(args, final_result_path, repeat_id=i + 1, split_stats=engine.get_split_anomaly_stats())
         logging.info(f"args: {args}")
         print(f"args: {args}")
 
@@ -157,7 +166,7 @@ def main(args):
             engine.run()
 
 
-def write_metadata(args, final_result_path, repeat_id):
+def write_metadata(args, final_result_path, repeat_id, split_stats=None):
     if args.llm_provider == "chatgpt-oauth" and args.llm_engine == "gpt-4-mini":
         resolved_llm_engine = "gpt-5.4-mini"
     else:
@@ -175,16 +184,20 @@ def write_metadata(args, final_result_path, repeat_id):
         "llm_engine": args.llm_engine,
         "resolved_llm_engine": resolved_llm_engine,
         "llm_provider": args.llm_provider,
-        "temperature": 0.75,
+        "temperature": args.temperature,
+        "max_iter": args.max_iter,
+        "seed": args.seed,
         "segment_selection_mode": args.segment_selection_mode,
         "selector_config_path": args.segment_selector_config,
         "timestamp": datetime.now().isoformat(),
+
         "notes": (
             "Evidence mode uses label-based candidate generation as an "
             "oracle-like analysis setting."
             if args.segment_selection_mode == "evidence"
             else ""
         ),
+        "split_stats": split_stats,
     }
     with open(os.path.join(final_result_path, "metadata.json"), "w") as f:
         json.dump(metadata, f, indent=2)
@@ -299,6 +312,12 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.0,
+        help="Deterministic temperature for all LLM calls.",
+    )
+    parser.add_argument(
         "--timeout",
         type=int,
         default=150,
@@ -328,6 +347,12 @@ if __name__ == "__main__":
         type=int,
         default=None,
         help="Cap the number of training iterations. If unset, uses the mode's default.",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=8,
+        help="Random seed used for numpy/random and recorded in metadata.",
     )
     parser.add_argument(
         "--segment_selection_mode",

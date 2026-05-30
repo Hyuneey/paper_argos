@@ -77,6 +77,7 @@ class SegmentSelectionTests(unittest.TestCase):
                         "  anomaly_coverage: 0.15",
                         "  normal_contrast: 0.25",
                         "  reference_context: 0.15",
+                        "  normal_context_floor: 0.10",
                         "  length_penalty: 0.08",
                         "  token_cost: 0.02",
                     ]
@@ -95,29 +96,29 @@ class SegmentSelectionTests(unittest.TestCase):
             self.assertEqual(first.selected.kind, second.selected.kind)
             self.assertEqual(first.selected_score.total, second.selected_score.total)
 
-    def test_selector_prefers_reference_context_on_ties(self):
+    def test_selector_applies_normal_context_floor_against_full_density_candidates(self):
         df = pd.DataFrame(
             {
-                "value": [0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 0.0, 0.0],
-                "label": [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
-                "index": list(range(12)),
+                "value": [0.0, 0.0, 0.0, 0.0, 5.0, 5.0, 5.0, 5.0],
+                "label": [0, 0, 0, 0, 1, 1, 1, 1],
+                "index": list(range(8)),
             }
         )
         candidates = [
             CandidateSegment(
-                kind="anomaly_only",
+                kind="full_density",
                 df=df.iloc[4:8].copy(),
                 start_pos=4,
                 end_pos=8,
-                rationale=("dense anomaly window",),
+                rationale=("anomaly-only window",),
                 reference_segment=None,
             ),
             CandidateSegment(
-                kind="matched_reference",
+                kind="reference_anchored",
                 df=df.iloc[4:8].copy(),
                 start_pos=4,
                 end_pos=8,
-                rationale=("same anomaly window with matched reference",),
+                rationale=("same window with matched reference",),
                 reference_segment=(0, 4),
             ),
         ]
@@ -133,6 +134,7 @@ class SegmentSelectionTests(unittest.TestCase):
                         "  anomaly_coverage: 0.00",
                         "  normal_contrast: 0.00",
                         "  reference_context: 0.00",
+                        "  normal_context_floor: 1.00",
                         "  length_penalty: 0.00",
                         "  token_cost: 0.00",
                     ]
@@ -142,7 +144,7 @@ class SegmentSelectionTests(unittest.TestCase):
 
             result = SegmentSelector(str(config_path)).select(candidates, df, 4)
 
-        self.assertEqual(result.selected.kind, "matched_reference")
+        self.assertEqual(result.selected.kind, "reference_anchored")
 
     def test_trace_logger_writes_expected_schema(self):
         with tempfile.TemporaryDirectory() as tmpdir:

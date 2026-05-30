@@ -26,19 +26,21 @@ def parse_args():
         type=int,
         default=DEFAULT_CHUNK_SIZES,
     )
-    parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--mode", default="train-LLM-only")
     parser.add_argument("--dataset_mode", default="one-by-one")
     parser.add_argument("--top_k", type=int, default=5)
     parser.add_argument("--sample_per_prompt", type=int, default=1)
-    parser.add_argument("--llm_engine", default="gpt-4-mini")
+    parser.add_argument("--llm_engine", default="gpt-4o-mini")
     parser.add_argument(
         "--llm_provider",
         choices=["azure", "openai", "chatgpt-oauth", "self-hosted", "auto"],
-        default="chatgpt-oauth",
+        default="openai",
     )
+    parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--timeout", type=int, default=150)
     parser.add_argument("--max_iter", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=8)
     parser.add_argument("--max_attempts", type=int, default=3)
     parser.add_argument("--retry_wait_sec", type=int, default=15)
     parser.add_argument(
@@ -100,6 +102,10 @@ def main():
                 args.llm_engine,
                 "--llm_provider",
                 args.llm_provider,
+                "--temperature",
+                str(args.temperature),
+                "--seed",
+                str(args.seed),
                 "--timeout",
                 str(args.timeout),
                 "--segment_selection_mode",
