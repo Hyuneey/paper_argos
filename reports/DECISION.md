@@ -12,7 +12,7 @@
 - Cost CSV: `results/chunk_sensitivity_fixed_evidence_summary.csv` (108 rows)
 - Consistency CSV: `results/c2_consistency_summary.csv` (4 rows)
 - Morphology CSV: `results/c3_morphology_diagnostic.csv` (26 rows)
-- Commit hash: `a8cb059`
+- Commit hash: `9c8678a`
 
 ## Representative values
 - Performance: evidence mean point_f1_fixed=0.129812, fixed mean point_f1_fixed=0.260201.
