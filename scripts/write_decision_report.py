@@ -69,12 +69,16 @@ def _load_csv(path: Path) -> list[dict[str, str]]:
         return [dict(row) for row in csv.DictReader(f)]
 
 
+def _row_condition(row: dict[str, str]) -> str:
+    return (row.get("condition") or row.get("segment_selection_mode") or "").strip()
+
+
 def _evaluate_performance_leg(rows: list[dict[str, str]]) -> LegDecision:
     if not rows:
         return LegDecision("Performance", "WEAK", "No performance summary rows available.")
 
-    evidence_rows = [row for row in rows if row.get("condition") in {"evidence", "event_bounded_reference"}]
-    fixed_rows = [row for row in rows if row.get("condition") == "fixed"]
+    evidence_rows = [row for row in rows if _row_condition(row) in {"evidence", "event_bounded_reference"}]
+    fixed_rows = [row for row in rows if _row_condition(row) == "fixed"]
     if not evidence_rows or not fixed_rows:
         return LegDecision("Performance", "WEAK", "Missing fixed or evidence rows for the performance leg.")
 
@@ -100,8 +104,8 @@ def _evaluate_cost_leg(rows: list[dict[str, str]]) -> LegDecision:
     if not rows:
         return LegDecision("Cost", "WEAK", "No cost summary rows available.")
 
-    evidence_rows = [row for row in rows if row.get("condition") == "evidence"]
-    fixed_rows = [row for row in rows if row.get("condition") == "fixed"]
+    evidence_rows = [row for row in rows if _row_condition(row) == "evidence"]
+    fixed_rows = [row for row in rows if _row_condition(row) == "fixed"]
     if not evidence_rows or not fixed_rows:
         return LegDecision("Cost", "WEAK", "Missing fixed or evidence rows for the cost leg.")
 
@@ -130,8 +134,8 @@ def _evaluate_traceability_leg(rows: list[dict[str, str]]) -> LegDecision:
     if not rows:
         return LegDecision("Traceability", "WEAK", "No consistency summary rows available.")
 
-    fixed_rows = [row for row in rows if row.get("condition") == "fixed"]
-    evidence_rows = [row for row in rows if row.get("condition") == "evidence"]
+    fixed_rows = [row for row in rows if _row_condition(row) == "fixed"]
+    evidence_rows = [row for row in rows if _row_condition(row) == "evidence"]
     if not evidence_rows or not fixed_rows:
         return LegDecision("Traceability", "WEAK", "Missing fixed or evidence rows for the traceability leg.")
 
@@ -212,20 +216,20 @@ def _representative_values(
     morphology_rows: list[dict[str, str]],
 ) -> list[str]:
     lines: list[str] = []
-    perf_evidence = [row for row in performance_rows if row.get("condition") in {"evidence", "event_bounded_reference"}]
-    perf_fixed = [row for row in performance_rows if row.get("condition") == "fixed"]
+    perf_evidence = [row for row in performance_rows if _row_condition(row) in {"evidence", "event_bounded_reference"}]
+    perf_fixed = [row for row in performance_rows if _row_condition(row) == "fixed"]
     if perf_evidence and perf_fixed:
         lines.append(
             f"- Performance: evidence mean point_f1_fixed={_fmt(_mean(_to_float(row.get('mean_point_f1_fixed')) for row in perf_evidence))}, fixed mean point_f1_fixed={_fmt(_mean(_to_float(row.get('mean_point_f1_fixed')) for row in perf_fixed))}."
         )
-    cost_evidence = [row for row in cost_rows if row.get("condition") == "evidence"]
-    cost_fixed = [row for row in cost_rows if row.get("condition") == "fixed"]
+    cost_evidence = [row for row in cost_rows if _row_condition(row) == "evidence"]
+    cost_fixed = [row for row in cost_rows if _row_condition(row) == "fixed"]
     if cost_evidence and cost_fixed:
         lines.append(
             f"- Cost: evidence mean tokens={_fmt(_mean(_extract_metric(row, ['mean_token_count_detection', 'token_count_detection']) for row in cost_evidence))}, fixed mean tokens={_fmt(_mean(_extract_metric(row, ['mean_token_count_detection', 'token_count_detection']) for row in cost_fixed))}."
         )
-    cons_evidence = [row for row in consistency_rows if row.get("condition") == "evidence"]
-    cons_fixed = [row for row in consistency_rows if row.get("condition") == "fixed"]
+    cons_evidence = [row for row in consistency_rows if _row_condition(row) == "evidence"]
+    cons_fixed = [row for row in consistency_rows if _row_condition(row) == "fixed"]
     if cons_evidence and cons_fixed:
         lines.append(
             f"- Traceability: evidence mean heldout_support_gap={_fmt(_mean(_extract_metric(row, ['heldout_support_gap_mean', 'heldout_support_gap', 'mean_heldout_support_gap']) for row in cons_evidence))}, fixed mean heldout_support_gap={_fmt(_mean(_extract_metric(row, ['heldout_support_gap_mean', 'heldout_support_gap', 'mean_heldout_support_gap']) for row in cons_fixed))}."

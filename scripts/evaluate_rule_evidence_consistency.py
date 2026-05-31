@@ -206,13 +206,31 @@ def _evaluate_local_trace(
 def _window_support(rule_module: Any, window_df: pd.DataFrame) -> bool:
     if window_df is None or window_df.empty:
         return False
-    if "value" in window_df.columns:
-        sample = window_df[["value"]].to_numpy(dtype=float)
+
+    # Most generated rules expect at least two columns where column 0 is the
+    # signal value and column 1 is the ordering/index dimension. Prefer that
+    # shape explicitly instead of sending a single-column slice.
+    preferred_columns = [col for col in ["value", "index"] if col in window_df.columns]
+    if len(preferred_columns) >= 2:
+        sample_df = window_df[preferred_columns[:2]]
     else:
-        numeric = window_df.select_dtypes(include=[np.number])
-        sample = numeric.to_numpy(dtype=float)
-        if sample.size == 0:
-            sample = window_df.to_numpy(dtype=float)
+        numeric = window_df.select_dtypes(include=[np.number]).copy()
+        if "label" in numeric.columns:
+            numeric = numeric.drop(columns=["label"])
+        if numeric.shape[1] >= 2:
+            sample_df = numeric.iloc[:, :2]
+        elif numeric.shape[1] == 1:
+            sample_df = numeric.iloc[:, :1].copy()
+            sample_df["__fallback_index__"] = np.arange(len(sample_df), dtype=float)
+        else:
+            sample_df = pd.DataFrame({"value": np.arange(len(window_df), dtype=float), "index": np.arange(len(window_df), dtype=float)})
+
+    sample = sample_df.to_numpy(dtype=float)
+    if sample.ndim == 1:
+        sample = sample.reshape(-1, 1)
+    if sample.shape[1] == 1:
+        sample = np.column_stack([sample[:, 0], np.arange(len(sample), dtype=float)])
+
     labels = rule_module.inference(sample)
     return bool(np.asarray(labels).sum() > 0)
 
