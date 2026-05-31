@@ -3,7 +3,7 @@
 **Conclusion:** NO-GO
 
 ## Leg summary
-- **Performance**: FAIL — evidence mean point_f1_fixed=0.034940 vs fixed mean point_f1_fixed=0.138101 (Δ=-0.103161).
+- **Performance**: FAIL — evidence mean point_f1_fixed=0.129812 vs fixed mean point_f1_fixed=0.260201 (Δ=-0.130389).
 - **Cost**: WEAK — tokens fixed=15362.018519 evidence=6399.250000 (Δ=8962.768519); prompt rows fixed=nan evidence=nan (Δ=nan).
 - **Traceability**: WEAK — Missing fixed or evidence rows for the traceability leg.
 
@@ -15,7 +15,7 @@
 - Commit hash: `e4f76ef`
 
 ## Representative values
-- Performance: evidence mean point_f1_fixed=0.034940, fixed mean point_f1_fixed=0.138101.
+- Performance: evidence mean point_f1_fixed=0.129812, fixed mean point_f1_fixed=0.260201.
 - Cost: evidence mean tokens=6399.250000, fixed mean tokens=15362.018519.
 - Morphology: most common label is `mixed` across 26 series.
 
